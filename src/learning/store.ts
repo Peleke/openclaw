@@ -164,3 +164,92 @@ export function countTraces(db: DatabaseSync): number {
   const row = db.prepare("SELECT COUNT(*) as cnt FROM run_traces").get() as { cnt: number };
   return row.cnt;
 }
+
+// -- Pagination + aggregation (observability layer) --
+
+export type TraceSummary = {
+  traceCount: number;
+  armCount: number;
+  minTimestamp: number | null;
+  maxTimestamp: number | null;
+  totalTokens: number;
+};
+
+export function getTraceSummary(db: DatabaseSync): TraceSummary {
+  const row = db
+    .prepare(
+      `SELECT
+        COUNT(*) as trace_count,
+        MIN(timestamp) as min_ts,
+        MAX(timestamp) as max_ts,
+        COALESCE(SUM(json_extract(usage_json, '$.total')), 0) as total_tokens
+      FROM run_traces`,
+    )
+    .get() as Record<string, unknown>;
+  const armRow = db.prepare("SELECT COUNT(*) as cnt FROM arm_posteriors").get() as { cnt: number };
+  return {
+    traceCount: row.trace_count as number,
+    armCount: armRow.cnt,
+    minTimestamp: (row.min_ts as number) ?? null,
+    maxTimestamp: (row.max_ts as number) ?? null,
+    totalTokens: row.total_tokens as number,
+  };
+}
+
+export function listRunTracesWithOffset(
+  db: DatabaseSync,
+  opts: { limit?: number; offset?: number },
+): { traces: RunTrace[]; total: number } {
+  const limit = opts.limit ?? 100;
+  const offset = opts.offset ?? 0;
+  const total = countTraces(db);
+  const rows = db
+    .prepare("SELECT * FROM run_traces ORDER BY timestamp DESC LIMIT ? OFFSET ?")
+    .all(limit, offset) as Array<Record<string, unknown>>;
+  return { traces: rows.map(rowToTrace), total };
+}
+
+export type TimeseriesBucket = {
+  t: number;
+  value: number;
+  armId?: string;
+};
+
+export function getTokenTimeseries(db: DatabaseSync, windowMs: number): TimeseriesBucket[] {
+  const rows = db
+    .prepare(
+      `SELECT
+        (timestamp / ? * ?) as bucket,
+        AVG(json_extract(usage_json, '$.total')) as avg_tokens
+      FROM run_traces
+      WHERE usage_json IS NOT NULL
+      GROUP BY bucket
+      ORDER BY bucket ASC`,
+    )
+    .all(windowMs, windowMs) as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    t: r.bucket as number,
+    value: r.avg_tokens as number,
+  }));
+}
+
+export function getConvergenceTimeseries(db: DatabaseSync, windowMs: number): TimeseriesBucket[] {
+  // Per-arm posterior mean over time buckets based on trace timestamps
+  const rows = db
+    .prepare(
+      `SELECT
+        p.arm_id,
+        (t.timestamp / ? * ?) as bucket,
+        p.alpha / (p.alpha + p.beta) as mean
+      FROM arm_posteriors p
+      CROSS JOIN (SELECT DISTINCT (timestamp / ? * ?) as timestamp FROM run_traces) t
+      WHERE p.last_updated <= t.timestamp + ?
+      ORDER BY bucket ASC, p.arm_id`,
+    )
+    .all(windowMs, windowMs, windowMs, windowMs, windowMs) as Array<Record<string, unknown>>;
+  return rows.map((r) => ({
+    t: r.bucket as number,
+    value: r.mean as number,
+    armId: r.arm_id as string,
+  }));
+}
