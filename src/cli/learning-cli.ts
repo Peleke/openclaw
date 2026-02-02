@@ -7,14 +7,11 @@ import type { Command } from "commander";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
-import { loadConfig } from "../config/config.js";
+import { resolveOpenClawAgentDir } from "../agents/agent-paths.js";
 
 async function openDb() {
   const { openLearningDb } = await import("../learning/store.js");
-  const config = loadConfig();
-  const agentId = resolveDefaultAgentId(config);
-  const agentDir = resolveAgentWorkspaceDir(config, agentId);
+  const agentDir = resolveOpenClawAgentDir();
   return openLearningDb(agentDir);
 }
 
@@ -64,7 +61,6 @@ export function registerLearningCli(program: Command) {
     .option("--port <port>", "Gateway port", "18789")
     .action(async (opts) => {
       const { generateLearningDashboardHtml } = await import("../learning/dashboard-html.js");
-      const config = loadConfig();
       const port = opts.port;
       const apiBase = `http://localhost:${port}/__openclaw__/api/learning`;
       const html = generateLearningDashboardHtml({ apiBase });

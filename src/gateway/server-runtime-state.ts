@@ -109,11 +109,9 @@ export async function createGatewayRuntimeState(params: {
   try {
     const { createLearningApiHandler } = await import("../learning/api.js");
     const { openLearningDb } = await import("../learning/store.js");
-    const { resolveAgentWorkspaceDir, resolveDefaultAgentId } =
-      await import("../agents/agent-scope.js");
+    const { resolveOpenClawAgentDir } = await import("../agents/agent-paths.js");
     let learningDb: import("node:sqlite").DatabaseSync | null = null;
-    const agentId = resolveDefaultAgentId(params.cfg);
-    const agentDir = resolveAgentWorkspaceDir(params.cfg, agentId);
+    const agentDir = resolveOpenClawAgentDir();
     handleLearningApiRequest = createLearningApiHandler({
       getDb: () => {
         if (!learningDb) {
