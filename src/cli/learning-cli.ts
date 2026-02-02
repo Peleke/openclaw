@@ -10,9 +10,8 @@ import os from "node:os";
 import { resolveAgentWorkspaceDir, resolveDefaultAgentId } from "../agents/agent-scope.js";
 import { loadConfig } from "../config/config.js";
 
-function openDb() {
-  const { openLearningDb } =
-    require("../learning/store.js") as typeof import("../learning/store.js");
+async function openDb() {
+  const { openLearningDb } = await import("../learning/store.js");
   const config = loadConfig();
   const agentId = resolveDefaultAgentId(config);
   const agentDir = resolveAgentWorkspaceDir(config, agentId);
@@ -27,7 +26,7 @@ export function registerLearningCli(program: Command) {
     .description("Show learning layer summary and top/bottom arms")
     .action(async () => {
       const { formatLearningStatus } = await import("../learning/cli-status.js");
-      const db = openDb();
+      const db = await openDb();
       try {
         console.log(formatLearningStatus(db));
       } finally {
@@ -46,7 +45,7 @@ export function registerLearningCli(program: Command) {
     .action(async (opts) => {
       const { exportLearningData } = await import("../learning/cli-export.js");
       const format = opts.format === "csv" ? "csv" : "json";
-      const db = openDb();
+      const db = await openDb();
       try {
         const output = exportLearningData(db, {
           format,

@@ -4,6 +4,7 @@
  */
 
 import type { DatabaseSync } from "node:sqlite";
+import { requireNodeSqlite } from "../memory/sqlite.js";
 import fs from "node:fs";
 import path from "node:path";
 import type { RunTrace, ArmPosterior } from "./types.js";
@@ -48,7 +49,7 @@ export function ensureLearningSchema(db: DatabaseSync): void {
 // -- DB lifecycle --
 
 export function openLearningDb(agentDir: string): DatabaseSync {
-  const { DatabaseSync: DB } = require("node:sqlite") as typeof import("node:sqlite");
+  const { DatabaseSync: DB } = requireNodeSqlite();
   const dir = path.join(agentDir, "learning");
   fs.mkdirSync(dir, { recursive: true });
   const dbPath = path.join(dir, "learning.db");
