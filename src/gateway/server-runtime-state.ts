@@ -104,6 +104,32 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
+  // Learning API — lazily open DB on first request
+  let handleLearningApiRequest: import("./server-http.js").HooksRequestHandler | undefined;
+  try {
+    const { createLearningApiHandler } = await import("../learning/api.js");
+    const { openLearningDb } = await import("../learning/store.js");
+    const { resolveAgentWorkspaceDir, resolveDefaultAgentId } =
+      await import("../agents/agent-scope.js");
+    let learningDb: import("node:sqlite").DatabaseSync | null = null;
+    const agentId = resolveDefaultAgentId(params.cfg);
+    const agentDir = resolveAgentWorkspaceDir(params.cfg, agentId);
+    handleLearningApiRequest = createLearningApiHandler({
+      getDb: () => {
+        if (!learningDb) {
+          try {
+            learningDb = openLearningDb(agentDir);
+          } catch {
+            return null;
+          }
+        }
+        return learningDb;
+      },
+    });
+  } catch {
+    // Learning module not available — skip
+  }
+
   const bindHosts = await resolveGatewayListenHosts(params.bindHost);
   const httpServers: HttpServer[] = [];
   const httpBindHosts: string[] = [];
@@ -117,6 +143,7 @@ export async function createGatewayRuntimeState(params: {
       openResponsesConfig: params.openResponsesConfig,
       handleHooksRequest,
       handlePluginRequest,
+      handleLearningApiRequest,
       resolvedAuth: params.resolvedAuth,
       tlsOptions: params.gatewayTls?.enabled ? params.gatewayTls.tlsOptions : undefined,
     });
