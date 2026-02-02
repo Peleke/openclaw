@@ -43,6 +43,7 @@ import {
 } from "../pi-embedded-helpers.js";
 import { normalizeUsage, type UsageLike } from "../usage.js";
 
+import { captureAndStoreTrace } from "../../learning/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
@@ -647,6 +648,26 @@ export async function runEmbeddedPiAgent(
               agentDir: params.agentDir,
             });
           }
+          // Learning layer: passive trace capture
+          if (params.config?.learning?.enabled && attempt.systemPromptReport) {
+            captureAndStoreTrace({
+              runId: params.runId,
+              sessionId: params.sessionId,
+              sessionKey: params.sessionKey,
+              report: attempt.systemPromptReport,
+              assistantTexts: attempt.assistantTexts,
+              toolMetas: attempt.toolMetas,
+              usage,
+              durationMs: Date.now() - started,
+              channel: params.messageChannel ?? params.messageProvider,
+              provider,
+              model: modelId,
+              isBaseline: true,
+              aborted,
+              agentDir,
+            });
+          }
+
           return {
             payloads: payloads.length ? payloads : undefined,
             meta: {
