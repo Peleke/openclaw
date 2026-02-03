@@ -10,40 +10,69 @@ import path from "node:path";
 import type { FilterConfig, FilterResult } from "./types.js";
 
 /**
+ * Check if a line is a Markdown heading (# Title, ## Subtitle, etc.)
+ * A heading must start with one or more # followed by a space or end of line.
+ */
+function isMarkdownHeading(line: string): boolean {
+  const trimmed = line.trim();
+  // Match: one or more #, then either space+content or end of string
+  return /^#+(\s|$)/.test(trimmed);
+}
+
+/**
  * Check if content should be extracted based on magic string and length.
  *
  * Magic string location:
- * - If line 1 is a heading (# Title), check line 2 for magic string
+ * - If line 1 is a Markdown heading (# Title), check line 2 for magic string
  * - Otherwise, check line 1 for magic string
+ *
+ * The magic string can either:
+ * - Be on its own line: "::publish\n\nContent here"
+ * - Have immediate content: "::publishContent follows immediately"
  */
 export function shouldExtract(content: string, config: FilterConfig): FilterResult {
   const lines = content.split("\n");
 
   // Determine which line should have the magic string
   let magicLineIndex = 0;
-  if (lines[0]?.trim().startsWith("#")) {
-    // Line 1 is a heading, magic string should be on line 2
+  const hasHeadingOnLine0 = lines[0] && isMarkdownHeading(lines[0]);
+  if (hasHeadingOnLine0) {
     magicLineIndex = 1;
   }
 
-  // Check for magic string
-  const magicLine = lines[magicLineIndex]?.trim();
-  if (magicLine !== config.magicString) {
+  // Check for magic string (must start the line)
+  const magicLine = lines[magicLineIndex] ?? "";
+  const trimmedMagicLine = magicLine.trim();
+
+  if (!trimmedMagicLine.startsWith(config.magicString)) {
     return {
       shouldExtract: false,
-      reason:
-        magicLineIndex === 0
-          ? "Missing magic string on first line"
-          : "Missing magic string on line after title",
+      reason: "Missing magic string",
     };
   }
 
-  // Get content after magic string line (keep the title if present)
-  const contentLines = [
-    ...(magicLineIndex === 1 ? [lines[0]] : []), // Keep title if it exists
-    ...lines.slice(magicLineIndex + 1),
-  ];
-  const strippedContent = contentLines.join("\n").replace(/^[\s]*/, "");
+  // Extract content after magic string
+  const afterMagicOnSameLine = trimmedMagicLine.slice(config.magicString.length);
+  const remainingLines = lines.slice(magicLineIndex + 1);
+
+  // Build content array
+  const contentParts: string[] = [];
+
+  // Include title if we had a heading
+  if (hasHeadingOnLine0) {
+    contentParts.push(lines[0]);
+  }
+
+  // Include content after magic string on same line (if any)
+  if (afterMagicOnSameLine) {
+    contentParts.push(afterMagicOnSameLine);
+  }
+
+  // Include remaining lines
+  contentParts.push(...remainingLines);
+
+  // Join and strip leading whitespace
+  const strippedContent = contentParts.join("\n").replace(/^[\s]*/, "");
 
   // Check minimum length
   if (strippedContent.length < config.minContentLength) {
