@@ -74,14 +74,57 @@ export type OpenClawPayloadMap = {
     data: Record<string, unknown>;
   };
 
-  /** Journal insight extracted (PR-Firm pipeline) */
+  /** Journal insight extracted (P1 content pipeline) */
   "journal.insight.extracted": {
-    path: string;
-    insights: string[];
-    category: string;
+    source: {
+      signalType: string;
+      signalId: string;
+      path: string;
+      contentHash: string;
+    };
+    insights: Array<{
+      id: string;
+      topic: string;
+      pillar?: string;
+      hook: string;
+      excerpt: string;
+      scores: {
+        topicClarity: number;
+        publishReady: number;
+        novelty: number;
+      };
+      formats: string[];
+      concepts?: Array<{
+        name: string;
+        type: "entity" | "concept" | "theme";
+        confidence: number;
+      }>;
+    }>;
+    extractedAt: number;
+    extractorVersion: string;
   };
 
-  /** Draft generated from insights (PR-Firm pipeline) */
+  /** Digest ready for delivery (batched insights) */
+  "journal.digest.ready": {
+    flushedAt: number;
+    insights: Array<{
+      id: string;
+      topic: string;
+      pillar?: string;
+      hook: string;
+      excerpt: string;
+      scores: {
+        topicClarity: number;
+        publishReady: number;
+        novelty: number;
+      };
+      formats: string[];
+      sourcePath: string;
+    }>;
+    trigger: "count" | "time" | "manual";
+  };
+
+  /** Draft generated from insights (P1 content pipeline) */
   "draft.generated": {
     draftId: string;
     platform: "twitter" | "linkedin" | "blog";
