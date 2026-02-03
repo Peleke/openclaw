@@ -23,6 +23,13 @@ export {
   type ObsidianWatcherOptions,
 } from "./sources/obsidian-watcher.js";
 
+// Responders
+export {
+  registerResponders,
+  createTaskLoggerResponder,
+  type Responder,
+} from "./responders/index.js";
+
 // Domain types (kept from original)
 export type { Block, Task, CadenceConfig, NudgeState } from "./types.js";
 export { CADENCE_DEFAULTS } from "./types.js";
