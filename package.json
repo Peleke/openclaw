@@ -168,6 +168,7 @@
     "@mariozechner/pi-coding-agent": "0.50.7",
     "@mariozechner/pi-tui": "0.50.7",
     "@mozilla/readability": "^0.6.0",
+    "@peleke.s/cadence": "^0.1.0",
     "@sinclair/typebox": "0.34.47",
     "@slack/bolt": "^4.6.0",
     "@slack/web-api": "^7.13.0",
