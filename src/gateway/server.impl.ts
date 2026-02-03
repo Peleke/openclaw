@@ -70,6 +70,7 @@ import { startGatewayTailscaleExposure } from "./server-tailscale.js";
 import { loadGatewayTlsRuntime } from "./server/tls.js";
 import { createWizardSessionTracker } from "./server-wizard-sessions.js";
 import { attachGatewayWsHandlers } from "./server-ws-runtime.js";
+import { startGatewayCadence, type CadenceGatewayState } from "./server-cadence.js";
 
 export { __resetModelCatalogCacheForTest } from "./server-model-catalog.js";
 
@@ -87,6 +88,7 @@ const logReload = log.child("reload");
 const logHooks = log.child("hooks");
 const logPlugins = log.child("plugins");
 const logWsControl = log.child("ws");
+const logCadence = log.child("cadence");
 const canvasRuntime = runtimeForLogger(logCanvas);
 
 export type GatewayServer = {
@@ -506,6 +508,17 @@ export async function startGatewayServer(
     logBrowser,
   }));
 
+  // Start Cadence signal bus (ambient agency)
+  let cadenceState: CadenceGatewayState | null = null;
+  try {
+    cadenceState = await startGatewayCadence({
+      cfg: cfgAtStart,
+      log: logCadence,
+    });
+  } catch (err) {
+    logCadence.error(`failed to start: ${String(err)}`);
+  }
+
   const { applyHotReload, requestGatewayRestart } = createGatewayReloadHandlers({
     deps,
     broadcast,
@@ -552,6 +565,7 @@ export async function startGatewayServer(
     canvasHostServer,
     stopChannel,
     pluginServices,
+    cadenceState,
     cron,
     heartbeatRunner,
     nodePresenceTimers,

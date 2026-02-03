@@ -13,6 +13,7 @@ import type {
 } from "./types.gateway.js";
 import type { HooksConfig } from "./types.hooks.js";
 import type { LearningConfig } from "../learning/types.js";
+import type { CadenceConfig } from "../cadence/types.js";
 import type {
   AudioConfig,
   BroadcastConfig,
@@ -97,6 +98,7 @@ export type OpenClawConfig = {
   talk?: TalkConfig;
   gateway?: GatewayConfig;
   learning?: LearningConfig;
+  cadence?: CadenceConfig;
 };
 
 export type ConfigValidationIssue = {

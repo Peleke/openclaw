@@ -5,6 +5,7 @@ import { type ChannelId, listChannelPlugins } from "../channels/plugins/index.js
 import { stopGmailWatcher } from "../hooks/gmail-watcher.js";
 import type { HeartbeatRunner } from "../infra/heartbeat-runner.js";
 import type { PluginServicesHandle } from "../plugins/services.js";
+import type { CadenceGatewayState } from "./server-cadence.js";
 
 export function createGatewayCloseHandler(params: {
   bonjourStop: (() => Promise<void>) | null;
@@ -13,6 +14,7 @@ export function createGatewayCloseHandler(params: {
   canvasHostServer: CanvasHostServer | null;
   stopChannel: (name: ChannelId, accountId?: string) => Promise<void>;
   pluginServices: PluginServicesHandle | null;
+  cadenceState: CadenceGatewayState | null;
   cron: { stop: () => void };
   heartbeatRunner: HeartbeatRunner;
   nodePresenceTimers: Map<string, ReturnType<typeof setInterval>>;
@@ -68,6 +70,9 @@ export function createGatewayCloseHandler(params: {
       await params.pluginServices.stop().catch(() => {});
     }
     await stopGmailWatcher();
+    if (params.cadenceState) {
+      await params.cadenceState.stop().catch(() => {});
+    }
     params.cron.stop();
     params.heartbeatRunner.stop();
     for (const timer of params.nodePresenceTimers.values()) {
