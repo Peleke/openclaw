@@ -11,8 +11,8 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import os from "node:os";
+import type { SignalBus } from "@peleke.s/cadence";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
-import type { SignalBus } from "../../signal-bus.js";
 import type { OpenClawSignal } from "../../signals.js";
 import type { Responder } from "../index.js";
 import { createAccumulator, type DigestAccumulator } from "./accumulator.js";
@@ -77,7 +77,7 @@ export function createInsightDigestResponder(
       });
 
       // Subscribe to insight.extracted signals
-      const unsubSignal = bus.subscribe("journal.insight.extracted", async (signal) => {
+      const unsubSignal = bus.on("journal.insight.extracted", async (signal) => {
         const { insights, source } = signal.payload;
 
         for (const insight of insights) {

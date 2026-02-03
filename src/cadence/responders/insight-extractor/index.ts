@@ -7,10 +7,11 @@
  */
 
 import crypto from "node:crypto";
+import type { SignalBus } from "@peleke.s/cadence";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
-import type { SignalBus } from "../../signal-bus.js";
 import type { OpenClawSignal } from "../../signals.js";
 import type { Responder } from "../index.js";
+import { type LLMProvider, toLegacyLLMProvider } from "../../llm/index.js";
 import { createDebouncer, createBatcher } from "./debounce.js";
 import { shouldExtract, shouldSkipPath, extractPillarHint } from "./filters.js";
 import {
@@ -25,7 +26,11 @@ const log = createSubsystemLogger("cadence").child("insight-extractor");
 
 const EXTRACTOR_VERSION = "0.1.0";
 
-export interface LLMProvider {
+/**
+ * Legacy LLM provider interface for backwards compatibility.
+ * @deprecated Use LLMProvider from ../../llm/index.js instead.
+ */
+export interface LegacyLLMProvider {
   chat(
     messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
   ): Promise<string>;
@@ -35,8 +40,8 @@ export interface InsightExtractorOptions {
   /** Partial config overrides */
   config?: Partial<ExtractorConfig>;
 
-  /** LLM provider for extraction */
-  llm: LLMProvider;
+  /** LLM provider for extraction (new interface) */
+  llm: LLMProvider | LegacyLLMProvider;
 
   /** Custom hash function for content (for testing) */
   hashContent?: (content: string) => string;
@@ -57,6 +62,18 @@ function defaultHashContent(content: string): string {
 }
 
 /**
+ * Normalize LLM provider to legacy interface for internal use.
+ */
+function normalizeLLMProvider(llm: LLMProvider | LegacyLLMProvider): LegacyLLMProvider {
+  // Check if it's the new LLMProvider (has 'name' property)
+  if ("name" in llm && typeof (llm as LLMProvider).name === "string") {
+    return toLegacyLLMProvider(llm as LLMProvider);
+  }
+  // Already legacy format
+  return llm as LegacyLLMProvider;
+}
+
+/**
  * Create the insight extractor responder.
  */
 export function createInsightExtractorResponder(options: InsightExtractorOptions): Responder {
@@ -66,7 +83,7 @@ export function createInsightExtractorResponder(options: InsightExtractorOptions
   };
 
   const hashContent = options.hashContent ?? defaultHashContent;
-  const { llm } = options;
+  const llm = normalizeLLMProvider(options.llm);
 
   // Build system prompt once
   const systemPrompt = buildExtractionSystemPrompt(config.pillars);
@@ -155,7 +172,7 @@ export function createInsightExtractorResponder(options: InsightExtractorOptions
       };
 
       // Subscribe to note modified signals
-      const unsubSignal = bus.subscribe("obsidian.note.modified", async (signal) => {
+      const unsubSignal = bus.on("obsidian.note.modified", async (signal) => {
         const { path: filePath, content, frontmatter } = signal.payload;
 
         // Skip test/debug files
@@ -214,3 +231,7 @@ export {
   type PillarConfig,
 } from "./prompts.js";
 export * from "./types.js";
+
+// Re-export LLM provider types
+export type { LLMProvider } from "../../llm/index.js";
+export { createOpenClawLLMAdapter, createMockLLMProvider } from "../../llm/index.js";
