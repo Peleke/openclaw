@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { extractTasks, readPlanFile } from "./obsidian.js";
 import { mkdir, writeFile, rm } from "node:fs/promises";
 import { join } from "node:path";

@@ -101,10 +101,10 @@ describe("SignalBus - Core Functionality", () => {
 });
 
 describe("SignalBus - Error Handling", () => {
-  let bus: ReturnType<typeof createSignalBus>;
+  let _bus: ReturnType<typeof createSignalBus>;
 
   beforeEach(() => {
-    bus = createSignalBus();
+    _bus = createSignalBus();
   });
 
   it("isolates handler errors and calls all handlers", async () => {

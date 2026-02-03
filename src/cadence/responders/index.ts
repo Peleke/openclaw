@@ -8,7 +8,7 @@
  * - Chain signals
  */
 
-import type { OpenClawSignal, OpenClawSignalType } from "../signals.js";
+import type { OpenClawSignal } from "../signals.js";
 import type { SignalBus } from "@peleke.s/cadence";
 
 export interface Responder {
@@ -35,3 +35,7 @@ export function registerResponders(
 
 // Export individual responders
 export { createTaskLoggerResponder } from "./task-logger.js";
+export {
+  createTelegramNotifierResponder,
+  type TelegramNotifierConfig,
+} from "./telegram-notifier.js";

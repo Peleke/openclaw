@@ -65,8 +65,10 @@ export function createObsidianWatcherSource(
   let watcher: FSWatcher | null = null;
   let emitFn: ((signal: OpenClawSignal) => Promise<void>) | null = null;
 
-  async function processFile(path: string, eventType: "add" | "change"): Promise<void> {
+  async function processFile(path: string, _eventType: "add" | "change"): Promise<void> {
     if (!emitFn) return;
+    // Only process markdown files
+    if (!path.endsWith(".md")) return;
 
     try {
       const content = await readFile(path, "utf-8");
@@ -125,13 +127,14 @@ export function createObsidianWatcherSource(
     watcher = watch(vaultPath, {
       ignoreInitial: true,
       ignored: (path: string) => {
-        // Exclude patterns
+        // Exclude patterns (node_modules, .obsidian, etc.)
         for (const pattern of exclude) {
           const simplified = pattern.replace(/\*\*/g, "").replace(/\*/g, "");
           if (path.includes(simplified)) return true;
         }
-        // Only include .md files
-        if (!path.endsWith(".md")) return true;
+        // Only emit events for .md files; but we don't filter here since
+        // directories also get checked. The processFile handler will only
+        // get called for actual file events, not directory events.
         return false;
       },
       awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },

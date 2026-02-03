@@ -14,7 +14,7 @@ import {
   type Source,
   type Middleware,
 } from "@peleke.s/cadence";
-import type { OpenClawSignal, OpenClawSignalType } from "./signals.js";
+import type { OpenClawSignal } from "./signals.js";
 
 export interface OpenClawBusOptions {
   /** Enable debug logging */
