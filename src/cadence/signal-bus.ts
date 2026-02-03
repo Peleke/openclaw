@@ -10,6 +10,8 @@ import type { Signal, SignalHandler, SignalType } from "./types.js";
 export interface SignalBus {
   emit<T extends SignalType>(signal: Signal<T>): Promise<void>;
   subscribe<T extends SignalType>(type: T, handler: SignalHandler<T>): () => void;
+  /** Alias for subscribe (compatible with @peleke.s/cadence SignalBus) */
+  on<T extends SignalType>(type: T, handler: SignalHandler<T>): () => void;
   clear(): void;
 }
 
@@ -44,5 +46,5 @@ export function createSignalBus(opts?: {
     handlers.clear();
   }
 
-  return { emit, subscribe, clear };
+  return { emit, subscribe, on: subscribe, clear };
 }
