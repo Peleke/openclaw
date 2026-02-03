@@ -11,6 +11,9 @@ import {
   loadPosteriors,
   savePosterior,
   countTraces,
+  getTraceSummary,
+  listRunTracesWithOffset,
+  getTokenTimeseries,
 } from "./store.js";
 
 let db: InstanceType<typeof import("node:sqlite").DatabaseSync>;
@@ -160,6 +163,52 @@ describe("store", () => {
 
     it("returns empty map for empty DB", () => {
       expect(loadPosteriors(db).size).toBe(0);
+    });
+  });
+
+  describe("aggregation queries", () => {
+    it("getTraceSummary returns counts and totals", () => {
+      insertRunTrace(db, makeTrace({ usage: { total: 300 } }));
+      insertRunTrace(db, makeTrace({ usage: { total: 700 } }));
+      savePosterior(db, {
+        armId: "tool:exec:bash",
+        alpha: 1,
+        beta: 1,
+        pulls: 0,
+        lastUpdated: 1000,
+      });
+
+      const summary = getTraceSummary(db);
+      expect(summary.traceCount).toBe(2);
+      expect(summary.armCount).toBe(1);
+      expect(summary.totalTokens).toBe(1000);
+      expect(summary.minTimestamp).toBeDefined();
+    });
+
+    it("getTraceSummary handles empty DB", () => {
+      const summary = getTraceSummary(db);
+      expect(summary.traceCount).toBe(0);
+      expect(summary.totalTokens).toBe(0);
+    });
+
+    it("listRunTracesWithOffset paginates", () => {
+      for (let i = 0; i < 5; i++) {
+        insertRunTrace(db, makeTrace({ traceId: `t${i}`, timestamp: 1000 + i }));
+      }
+      const result = listRunTracesWithOffset(db, { limit: 2, offset: 1 });
+      expect(result.total).toBe(5);
+      expect(result.traces).toHaveLength(2);
+      // Ordered DESC, so offset=1 skips the newest
+      expect(result.traces[0].traceId).toBe("t3");
+    });
+
+    it("getTokenTimeseries returns bucketed data", () => {
+      insertRunTrace(db, makeTrace({ timestamp: 1_000_000, usage: { total: 500 } }));
+      insertRunTrace(db, makeTrace({ timestamp: 2_000_000, usage: { total: 300 } }));
+      const buckets = getTokenTimeseries(db, 3_600_000);
+      expect(buckets.length).toBeGreaterThan(0);
+      expect(buckets[0].t).toBeDefined();
+      expect(buckets[0].value).toBeDefined();
     });
   });
 });

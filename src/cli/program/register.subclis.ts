@@ -220,6 +220,14 @@ const entries: SubCliEntry[] = [
     },
   },
   {
+    name: "learning",
+    description: "Learning layer observability",
+    register: async (program) => {
+      const mod = await import("../learning-cli.js");
+      mod.registerLearningCli(program);
+    },
+  },
+  {
     name: "update",
     description: "CLI update helpers",
     register: async (program) => {
