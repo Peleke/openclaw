@@ -131,6 +131,15 @@ export type OpenClawPayloadMap = {
     content: string;
     fromInsights: string[];
   };
+
+  /** Scheduled job fired (cron) */
+  "cadence.cron.fired": {
+    jobId: string;
+    jobName: string;
+    expr: string;
+    firedAt: number;
+    tz?: string;
+  };
 };
 
 /**

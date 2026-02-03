@@ -37,6 +37,12 @@ export interface InsightDigestResponderOptions {
 
   /** Callback when flush occurs (in addition to signal emission) */
   onFlush?: (digest: DigestFlush) => Promise<void>;
+
+  /**
+   * Cron job IDs that trigger immediate flush (bypasses quiet hours and cooldown).
+   * e.g., ["nightly-digest"] to flush on the nightly-digest cron job.
+   */
+  cronTriggerJobIds?: string[];
 }
 
 /**
@@ -101,6 +107,73 @@ export function createInsightDigestResponder(
           log.debug(`Queued ${insights.length} insights from ${source.path}`);
         }
       });
+
+      // Subscribe to cron signals for scheduled flush (e.g., nightly digest)
+      const cronTriggerJobIds = options.cronTriggerJobIds ?? [];
+      const unsubCron =
+        cronTriggerJobIds.length > 0
+          ? bus.on("cadence.cron.fired", async (signal) => {
+              const { jobId, jobName } = signal.payload;
+
+              if (!cronTriggerJobIds.includes(jobId)) {
+                return; // Not a trigger job
+              }
+
+              log.info(`Cron-triggered flush: ${jobName} (${jobId})`);
+
+              // Get ALL queued insights (bypass cooldown for scheduled delivery)
+              const allQueued = await accumulator.getQueue();
+              if (allQueued.length === 0) {
+                log.debug("No insights to flush on cron trigger");
+                return;
+              }
+
+              // Build digest with "time" trigger (scheduled)
+              const digest: DigestFlush = {
+                flushedAt: Date.now(),
+                insights: allQueued,
+                trigger: "time",
+              };
+
+              // Call optional callback
+              if (options.onFlush) {
+                try {
+                  await options.onFlush(digest);
+                } catch (err) {
+                  log.error(
+                    `onFlush callback error: ${err instanceof Error ? err.message : String(err)}`,
+                  );
+                }
+              }
+
+              // Emit signal for downstream consumers
+              await bus.emit({
+                type: "journal.digest.ready",
+                id: crypto.randomUUID(),
+                ts: Date.now(),
+                payload: {
+                  flushedAt: digest.flushedAt,
+                  insights: digest.insights.map((i) => ({
+                    id: i.id,
+                    topic: i.topic,
+                    pillar: i.pillar,
+                    hook: i.hook,
+                    excerpt: i.excerpt,
+                    scores: i.scores,
+                    formats: i.formats,
+                    sourcePath: i.sourcePath,
+                  })),
+                  trigger: digest.trigger,
+                },
+              });
+
+              // Record flush and dequeue
+              await accumulator.recordFlush();
+              await accumulator.dequeue(allQueued.map((i) => i.id));
+
+              log.info(`Cron-flushed ${allQueued.length} insights`);
+            })
+          : () => {}; // No-op if no cron triggers configured
 
       // Schedule periodic flush checks
       const unsubScheduler = scheduler.scheduleCheck(async () => {
@@ -171,6 +244,7 @@ export function createInsightDigestResponder(
       // Return cleanup function
       return () => {
         unsubSignal();
+        unsubCron();
         unsubScheduler();
         log.info("Insight digest responder stopped");
       };
