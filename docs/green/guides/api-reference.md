@@ -283,6 +283,22 @@ curl "http://localhost:18789/__openclaw__/api/green/export/tcfd?period=2025&base
 
 **Response:** See [TCFD Guide](../standards/tcfd.md#export-format)
 
+### GET /export/iso14064
+
+Export in ISO 14064 format.
+
+**Parameters:**
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| `period` | string | current year | Reporting period |
+
+**Request:**
+```bash
+curl "http://localhost:18789/__openclaw__/api/green/export/iso14064?period=2025"
+```
+
+**Response:** See [ISO 14064 Guide](../standards/iso-14064.md#export-format)
+
 ## Error Responses
 
 All endpoints return errors as:

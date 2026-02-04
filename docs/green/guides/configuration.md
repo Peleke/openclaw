@@ -90,7 +90,7 @@ Use to provide custom factors when you have better data:
 |------|---------|-------------|
 | `number` | `null` | Alert threshold in grams CO₂ per day |
 
-When set, alerts trigger if daily emissions exceed this value (active mode only).
+When set, alerts trigger if daily emissions exceed this value.
 
 ```json
 {
@@ -111,7 +111,6 @@ Configuration can also be set via environment:
 | Variable | Config Path | Description |
 |----------|-------------|-------------|
 | `OPENCLAW_GREEN_ENABLED` | `green.enabled` | Enable tracking |
-| `OPENCLAW_GREEN_MODE` | `green.mode` | Tracking mode |
 | `OPENCLAW_GREEN_GRID_CARBON` | `green.defaultGridCarbon` | Grid intensity |
 
 ## Config Precedence
@@ -126,7 +125,6 @@ Configuration can also be set via environment:
 Invalid configuration is logged but doesn't crash:
 
 ```
-[WARN] green.mode: invalid value "aggressive", using "passive"
 [WARN] green.defaultGridCarbon: must be positive, using 400
 ```
 
@@ -140,7 +138,7 @@ Invalid configuration is logged but doesn't crash:
 }
 ```
 
-Uses all defaults: enabled, passive mode, 400 gCO₂/kWh.
+Uses all defaults: enabled, 400 gCO₂/kWh.
 
 ### Privacy-Conscious
 
@@ -154,18 +152,17 @@ Uses all defaults: enabled, passive mode, 400 gCO₂/kWh.
 
 No tracking at all.
 
-### Active Monitoring
+### With Daily Alerts
 
 ```json
 {
   "green": {
-    "mode": "active",
     "dailyAlertThreshold": 500
   }
 }
 ```
 
-Shows emissions after each request, alerts if >500g/day.
+Alerts if daily emissions exceed 500g CO₂.
 
 ### European Deployment
 

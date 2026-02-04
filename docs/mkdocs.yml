@@ -6,46 +6,10 @@ repo_name: Peleke/openclaw
 docs_dir: green
 
 theme:
-  name: material
-  palette:
-    - scheme: default
-      primary: green
-      accent: teal
-      toggle:
-        icon: material/brightness-7
-        name: Switch to dark mode
-    - scheme: slate
-      primary: green
-      accent: teal
-      toggle:
-        icon: material/brightness-4
-        name: Switch to light mode
-  features:
-    - navigation.tabs
-    - navigation.sections
-    - navigation.expand
-    - navigation.top
-    - content.code.copy
-    - content.tabs.link
-    - search.suggest
-    - search.highlight
-  icon:
-    repo: fontawesome/brands/github
+  name: readthedocs
 
 markdown_extensions:
-  - pymdownx.superfences:
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
-  - pymdownx.tabbed:
-      alternate_style: true
-  - pymdownx.highlight:
-      anchor_linenums: true
-  - pymdownx.inlinehilite
-  - pymdownx.snippets
   - admonition
-  - pymdownx.details
   - attr_list
   - md_in_html
   - tables
