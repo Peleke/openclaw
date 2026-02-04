@@ -14,6 +14,7 @@ import {
   getTraceSummary,
   listRunTracesWithOffset,
   getTokenTimeseries,
+  getBaselineComparison,
 } from "./store.js";
 
 let db: InstanceType<typeof import("node:sqlite").DatabaseSync>;
@@ -209,6 +210,67 @@ describe("store", () => {
       expect(buckets.length).toBeGreaterThan(0);
       expect(buckets[0].t).toBeDefined();
       expect(buckets[0].value).toBeDefined();
+    });
+  });
+
+  describe("baseline comparison", () => {
+    it("computes baseline vs selected token averages", () => {
+      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
+      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1200 } }));
+      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
+      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 600 } }));
+
+      const comparison = getBaselineComparison(db);
+      expect(comparison.baselineRuns).toBe(2);
+      expect(comparison.selectedRuns).toBe(2);
+      expect(comparison.baselineAvgTokens).toBe(1100); // (1000+1200)/2
+      expect(comparison.selectedAvgTokens).toBe(700); // (800+600)/2
+    });
+
+    it("computes token savings percentage", () => {
+      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
+      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
+
+      const comparison = getBaselineComparison(db);
+      expect(comparison.tokenSavingsPercent).toBeCloseTo(20, 1); // (1000-800)/1000*100
+    });
+
+    it("handles only baseline runs", () => {
+      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
+
+      const comparison = getBaselineComparison(db);
+      expect(comparison.baselineRuns).toBe(1);
+      expect(comparison.selectedRuns).toBe(0);
+      expect(comparison.baselineAvgTokens).toBe(1000);
+      expect(comparison.selectedAvgTokens).toBeNull();
+      expect(comparison.tokenSavingsPercent).toBeNull();
+    });
+
+    it("handles only selected runs", () => {
+      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
+
+      const comparison = getBaselineComparison(db);
+      expect(comparison.baselineRuns).toBe(0);
+      expect(comparison.selectedRuns).toBe(1);
+      expect(comparison.baselineAvgTokens).toBeNull();
+      expect(comparison.selectedAvgTokens).toBe(800);
+      expect(comparison.tokenSavingsPercent).toBeNull();
+    });
+
+    it("handles empty DB", () => {
+      const comparison = getBaselineComparison(db);
+      expect(comparison.baselineRuns).toBe(0);
+      expect(comparison.selectedRuns).toBe(0);
+      expect(comparison.tokenSavingsPercent).toBeNull();
+    });
+
+    it("computes duration comparison", () => {
+      insertRunTrace(db, makeTrace({ isBaseline: true, durationMs: 2000, usage: { total: 500 } }));
+      insertRunTrace(db, makeTrace({ isBaseline: false, durationMs: 1500, usage: { total: 400 } }));
+
+      const comparison = getBaselineComparison(db);
+      expect(comparison.baselineAvgDuration).toBe(2000);
+      expect(comparison.selectedAvgDuration).toBe(1500);
     });
   });
 });

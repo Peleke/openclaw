@@ -5,13 +5,17 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
+import type { LearningConfig } from "./types.js";
 import {
   getTraceSummary,
   listRunTracesWithOffset,
   loadPosteriors,
   getTokenTimeseries,
   getConvergenceTimeseries,
+  getBaselineComparison,
 } from "./store.js";
+import { betaCredibleInterval } from "./beta.js";
+import { SEED_ARM_IDS } from "./strategy.js";
 
 const PREFIX = "/__openclaw__/api/learning/";
 
@@ -37,8 +41,9 @@ const WINDOW_MAP: Record<string, number> = {
 
 export function createLearningApiHandler(opts: {
   getDb: () => DatabaseSync | null;
+  getConfig?: () => LearningConfig | null;
 }): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
-  const { getDb } = opts;
+  const { getDb, getConfig } = opts;
 
   return async (req, res) => {
     const url = parseUrl(req);
@@ -60,21 +65,55 @@ export function createLearningApiHandler(opts: {
     const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
 
     if (route === "summary") {
-      sendJson(res, 200, getTraceSummary(db));
+      const summary = getTraceSummary(db);
+      const baseline = getBaselineComparison(db);
+      sendJson(res, 200, {
+        ...summary,
+        baseline,
+      });
+      return true;
+    }
+
+    if (route === "config") {
+      const config = getConfig?.() ?? null;
+      sendJson(res, 200, {
+        enabled: config?.enabled ?? false,
+        phase: config?.phase ?? "passive",
+        strategy: config?.strategy ?? "thompson",
+        tokenBudget: config?.tokenBudget ?? 8000,
+        baselineRate: config?.baselineRate ?? 0.1,
+        minPulls: config?.minPulls ?? 5,
+        seedArmIds: SEED_ARM_IDS,
+      });
       return true;
     }
 
     if (route === "posteriors") {
       const map = loadPosteriors(db);
+      const config = getConfig?.() ?? null;
+      const minPulls = config?.minPulls ?? 5;
+      const seedSet = new Set(SEED_ARM_IDS);
+
       const arr = Array.from(map.values())
-        .map((p) => ({
-          armId: p.armId,
-          alpha: p.alpha,
-          beta: p.beta,
-          mean: p.alpha / (p.alpha + p.beta),
-          pulls: p.pulls,
-          lastUpdated: p.lastUpdated,
-        }))
+        .map((p) => {
+          const credible = betaCredibleInterval({ alpha: p.alpha, beta: p.beta });
+          return {
+            armId: p.armId,
+            alpha: p.alpha,
+            beta: p.beta,
+            mean: p.alpha / (p.alpha + p.beta),
+            pulls: p.pulls,
+            lastUpdated: p.lastUpdated,
+            // Thompson context
+            isSeed: seedSet.has(p.armId),
+            isUnderexplored: p.pulls < minPulls,
+            credibleInterval: {
+              lower: credible.lower,
+              upper: credible.upper,
+            },
+            confidence: p.pulls < 5 ? "low" : p.pulls < 20 ? "medium" : "high",
+          };
+        })
         .sort((a, b) => b.mean - a.mean);
       sendJson(res, 200, arr);
       return true;
