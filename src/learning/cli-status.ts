@@ -3,17 +3,45 @@
  */
 
 import type { DatabaseSync } from "node:sqlite";
-import { getTraceSummary, loadPosteriors } from "./store.js";
+import type { LearningConfig } from "./types.js";
+import { getTraceSummary, loadPosteriors, getBaselineComparison } from "./store.js";
 import { renderTable, type TableColumn } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
 
-export function formatLearningStatus(db: DatabaseSync): string {
+export type FormatLearningStatusOpts = {
+  db: DatabaseSync;
+  config?: LearningConfig | null;
+};
+
+export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStatusOpts): string {
+  // Support both old signature (db only) and new signature (opts object)
+  const opts: FormatLearningStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
+  const { db, config } = opts;
+
   const summary = getTraceSummary(db);
+  const baseline = getBaselineComparison(db);
   const lines: string[] = [];
 
-  // Summary header
-  lines.push(theme.heading("Learning Layer Status"));
+  // Summary header with mode badge
+  const phase = config?.phase ?? "passive";
+  const phaseColor = phase === "active" ? theme.success : theme.muted;
+  lines.push(
+    theme.heading("Learning Layer Status") + "  " + phaseColor(`[${phase.toUpperCase()}]`),
+  );
   lines.push("");
+
+  // Config info
+  if (config) {
+    const configParts = [];
+    if (config.tokenBudget) configParts.push(`Budget: ${config.tokenBudget.toLocaleString()}`);
+    if (config.baselineRate != null)
+      configParts.push(`Baseline: ${(config.baselineRate * 100).toFixed(0)}%`);
+    if (config.minPulls) configParts.push(`Min pulls: ${config.minPulls}`);
+    if (configParts.length > 0) {
+      lines.push(theme.muted("  " + configParts.join("  |  ")));
+      lines.push("");
+    }
+  }
 
   if (summary.traceCount === 0) {
     lines.push(
@@ -31,6 +59,30 @@ export function formatLearningStatus(db: DatabaseSync): string {
     `  Traces: ${theme.accent(String(summary.traceCount))}    Arms: ${theme.accent(String(summary.armCount))}    Tokens: ${theme.accent(summary.totalTokens.toLocaleString())}    Range: ${theme.muted(dateRange)}`,
   );
   lines.push("");
+
+  // Baseline comparison
+  const totalRuns = baseline.baselineRuns + baseline.selectedRuns;
+  if (totalRuns > 0) {
+    const baselinePct = ((baseline.baselineRuns / totalRuns) * 100).toFixed(1);
+    const selectedPct = ((baseline.selectedRuns / totalRuns) * 100).toFixed(1);
+
+    lines.push(theme.heading("Run Distribution"));
+    lines.push(
+      `  Baseline: ${theme.muted(String(baseline.baselineRuns))} (${baselinePct}%)    Selected: ${theme.accent(String(baseline.selectedRuns))} (${selectedPct}%)`,
+    );
+
+    if (baseline.tokenSavingsPercent != null) {
+      const savingsColor = baseline.tokenSavingsPercent > 0 ? theme.success : theme.error;
+      const sign = baseline.tokenSavingsPercent > 0 ? "+" : "";
+      lines.push(
+        `  Token Savings: ${savingsColor(sign + baseline.tokenSavingsPercent.toFixed(1) + "%")}` +
+          theme.muted(
+            ` (baseline avg: ${baseline.baselineAvgTokens?.toFixed(0) ?? "–"}, selected avg: ${baseline.selectedAvgTokens?.toFixed(0) ?? "–"})`,
+          ),
+      );
+    }
+    lines.push("");
+  }
 
   // Posteriors table
   const posteriors = loadPosteriors(db);

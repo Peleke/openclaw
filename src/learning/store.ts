@@ -254,3 +254,49 @@ export function getConvergenceTimeseries(db: DatabaseSync, windowMs: number): Ti
     armId: r.arm_id as string,
   }));
 }
+
+// -- Baseline comparison --
+
+export type BaselineComparison = {
+  baselineRuns: number;
+  selectedRuns: number;
+  baselineAvgTokens: number | null;
+  selectedAvgTokens: number | null;
+  tokenSavingsPercent: number | null;
+  baselineAvgDuration: number | null;
+  selectedAvgDuration: number | null;
+};
+
+export function getBaselineComparison(db: DatabaseSync): BaselineComparison {
+  const row = db
+    .prepare(
+      `SELECT
+        SUM(CASE WHEN is_baseline = 1 THEN 1 ELSE 0 END) as baseline_runs,
+        SUM(CASE WHEN is_baseline = 0 THEN 1 ELSE 0 END) as selected_runs,
+        AVG(CASE WHEN is_baseline = 1 THEN json_extract(usage_json, '$.total') END) as baseline_avg_tokens,
+        AVG(CASE WHEN is_baseline = 0 THEN json_extract(usage_json, '$.total') END) as selected_avg_tokens,
+        AVG(CASE WHEN is_baseline = 1 THEN duration_ms END) as baseline_avg_duration,
+        AVG(CASE WHEN is_baseline = 0 THEN duration_ms END) as selected_avg_duration
+      FROM run_traces
+      WHERE usage_json IS NOT NULL`,
+    )
+    .get() as Record<string, unknown>;
+
+  const baselineAvg = row.baseline_avg_tokens as number | null;
+  const selectedAvg = row.selected_avg_tokens as number | null;
+
+  let tokenSavingsPercent: number | null = null;
+  if (baselineAvg != null && selectedAvg != null && baselineAvg > 0) {
+    tokenSavingsPercent = ((baselineAvg - selectedAvg) / baselineAvg) * 100;
+  }
+
+  return {
+    baselineRuns: (row.baseline_runs as number) ?? 0,
+    selectedRuns: (row.selected_runs as number) ?? 0,
+    baselineAvgTokens: baselineAvg,
+    selectedAvgTokens: selectedAvg,
+    tokenSavingsPercent,
+    baselineAvgDuration: row.baseline_avg_duration as number | null,
+    selectedAvgDuration: row.selected_avg_duration as number | null,
+  };
+}

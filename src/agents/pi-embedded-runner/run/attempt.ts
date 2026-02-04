@@ -62,6 +62,8 @@ import { isAbortError } from "../abort.js";
 import { buildEmbeddedExtensionPaths } from "../extensions.js";
 import { applyExtraParamsToAgent } from "../extra-params.js";
 import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
+import { openLearningDb } from "../../../learning/store.js";
+import { selectPromptComponents, type PreRunSelectionResult } from "../../../learning/pre-run.js";
 import {
   logToolSchemasForGoogle,
   sanitizeSessionHistory,
@@ -238,7 +240,48 @@ export async function runEmbeddedAttempt(
           hasRepliedRef: params.hasRepliedRef,
           modelHasVision,
         });
-    const tools = sanitizeToolsForGoogle({ tools: toolsRaw, provider: params.provider });
+    // Learning layer: active arm selection (before tool sanitization)
+    let learningSelection: PreRunSelectionResult | null = null;
+    if (params.config?.learning?.phase === "active" && params.config?.learning?.enabled) {
+      try {
+        const learningDb = openLearningDb(agentDir);
+        try {
+          const runtimeChannel = normalizeMessageChannel(
+            params.messageChannel ?? params.messageProvider,
+          );
+          learningSelection = selectPromptComponents({
+            db: learningDb,
+            config: params.config.learning,
+            tools: toolsRaw,
+            skillEntries: skillEntries.map((s) => ({
+              name: s.skill.name,
+              // Estimate skill size from file path (source content not available)
+              // Default to 1000 chars (~250 tokens) as a reasonable estimate
+              promptChars: 1000,
+            })),
+            contextFiles: contextFiles.map((f) => ({
+              path: f.path,
+              content: f.content,
+            })),
+            context: {
+              sessionKey: params.sessionKey,
+              channel: runtimeChannel ?? undefined,
+              provider: params.provider,
+              model: params.modelId,
+            },
+          });
+        } finally {
+          learningDb.close();
+        }
+      } catch (err) {
+        log.debug(`learning: pre-run selection failed: ${String(err)}`);
+      }
+    }
+
+    // Apply learning selection to filter tools (if active)
+    const effectiveToolsRaw = learningSelection?.selectedTools ?? toolsRaw;
+
+    const tools = sanitizeToolsForGoogle({ tools: effectiveToolsRaw, provider: params.provider });
     logToolSchemasForGoogle({ tools, provider: params.provider });
 
     const machineName = await getMachineDisplayName();
@@ -883,6 +926,8 @@ export async function runEmbeddedAttempt(
         ),
         // Client tool call detected (OpenResponses hosted tools)
         clientToolCall: clientToolCallDetected ?? undefined,
+        // Learning layer selection result (active mode only)
+        learningSelection: learningSelection?.selection,
       };
     } finally {
       // Always tear down the session (and release the lock) before we leave this attempt.
