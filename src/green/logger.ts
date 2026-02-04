@@ -1,3 +1,3 @@
-import { createComponentLog } from "../infra/logger.js";
+import { createSubsystemLogger } from "../logging/subsystem.js";
 
-export const log = createComponentLog("green");
+export const log = createSubsystemLogger("green");

@@ -228,6 +228,14 @@ const entries: SubCliEntry[] = [
     },
   },
   {
+    name: "green",
+    description: "Environmental impact tracking",
+    register: async (program) => {
+      const mod = await import("../green-cli.js");
+      mod.registerGreenCli(program);
+    },
+  },
+  {
     name: "update",
     description: "CLI update helpers",
     register: async (program) => {

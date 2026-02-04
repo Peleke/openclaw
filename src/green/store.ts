@@ -207,7 +207,7 @@ export function getCarbonTimeseries(db: DatabaseSync, windowMs: number): CarbonT
   const rows = db
     .prepare(
       `SELECT
-        (timestamp / ? * ?) as bucket,
+        CAST(timestamp / ? AS INTEGER) * ? as bucket,
         SUM(total_co2_grams) as total_co2,
         COUNT(*) as trace_count
       FROM carbon_traces
