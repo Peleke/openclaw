@@ -11,9 +11,16 @@ import {
   listCarbonTraces,
   getProviderBreakdown,
   getCarbonTimeseries,
+  listCarbonTargets,
+  getTargetProgress,
 } from "./store.js";
-import { calculateEquivalents, formatConfidence } from "./carbon-calculator.js";
+import {
+  calculateEquivalents,
+  formatConfidence,
+  confidenceToUncertainty,
+} from "./carbon-calculator.js";
 import { DEFAULT_CARBON_FACTORS, FALLBACK_CARBON_FACTOR, resolveGreenConfig } from "./config.js";
+import { exportGhgProtocol, exportCdp, exportTcfd, exportIso14064 } from "./exports.js";
 
 const PREFIX = "/__openclaw__/api/green/";
 
@@ -104,6 +111,67 @@ export function createGreenApiHandler(opts: {
       const windowKey = url.searchParams.get("window") ?? "1d";
       const windowMs = WINDOW_MAP[windowKey] ?? 86_400_000;
       sendJson(res, 200, { buckets: getCarbonTimeseries(db, windowMs) });
+      return true;
+    }
+
+    // GET /api/green/intensity - TCFD intensity metrics
+    if (route === "intensity") {
+      const summary = getCarbonSummary(db);
+      const uncertainty = confidenceToUncertainty(summary.avgConfidence);
+      sendJson(res, 200, {
+        totalTokens: summary.totalTokens,
+        totalTraces: summary.traceCount,
+        intensityPerMillionTokens: summary.intensityPerMillionTokens,
+        intensityPerQuery: summary.intensityPerQuery,
+        uncertainty: {
+          lower: uncertainty.lower,
+          upper: uncertainty.upper,
+          percentRange: ((uncertainty.upper - uncertainty.lower) / 2) * 100,
+        },
+        avgConfidence: summary.avgConfidence,
+      });
+      return true;
+    }
+
+    // GET /api/green/targets - SBTi targets and progress
+    if (route === "targets") {
+      const targets = listCarbonTargets(db);
+      const progress = targets
+        .map((t) => getTargetProgress(db, t.targetId))
+        .filter((p) => p !== null);
+      sendJson(res, 200, { targets, progress });
+      return true;
+    }
+
+    // GET /api/green/export/ghg-protocol?period=2025-Q1
+    if (route === "export/ghg-protocol") {
+      const period = url.searchParams.get("period") ?? String(new Date().getFullYear());
+      sendJson(res, 200, exportGhgProtocol(db, period));
+      return true;
+    }
+
+    // GET /api/green/export/cdp?year=2025
+    if (route === "export/cdp") {
+      const year = parseInt(url.searchParams.get("year") ?? String(new Date().getFullYear()), 10);
+      sendJson(res, 200, exportCdp(db, year));
+      return true;
+    }
+
+    // GET /api/green/export/tcfd?period=2025&baseYear=2024
+    if (route === "export/tcfd") {
+      const period = url.searchParams.get("period") ?? undefined;
+      const baseYearStr = url.searchParams.get("baseYear");
+      const baseYear = baseYearStr ? parseInt(baseYearStr, 10) : undefined;
+      sendJson(res, 200, exportTcfd(db, { period, baseYear }));
+      return true;
+    }
+
+    // GET /api/green/export/iso14064?period=2025&baseYear=2024
+    if (route === "export/iso14064") {
+      const period = url.searchParams.get("period") ?? String(new Date().getFullYear());
+      const baseYearStr = url.searchParams.get("baseYear");
+      const baseYear = baseYearStr ? parseInt(baseYearStr, 10) : undefined;
+      sendJson(res, 200, exportIso14064(db, period, baseYear));
       return true;
     }
 

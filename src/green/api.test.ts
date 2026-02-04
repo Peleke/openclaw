@@ -4,9 +4,9 @@ import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DatabaseSync } from "node:sqlite";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ensureGreenSchema, insertCarbonTrace } from "./store.js";
+import { ensureGreenSchema, insertCarbonTrace, insertCarbonTarget } from "./store.js";
 import { createGreenApiHandler } from "./api.js";
-import type { CarbonTrace, GreenConfig } from "./types.js";
+import type { CarbonTrace, GreenConfig, CarbonTarget } from "./types.js";
 
 let db: DatabaseSync;
 let tmpDir: string;
@@ -30,7 +30,25 @@ function makeTrace(overrides: Partial<CarbonTrace> = {}): CarbonTrace {
     factorConfidence: 0.3,
     factorSource: "estimated",
     gridCarbonUsed: 400,
+    scope: 3,
+    category: 1,
+    calculationMethod: "average-data",
+    dataQualityScore: 3,
     aborted: false,
+    ...overrides,
+  };
+}
+
+function makeTarget(overrides: Partial<CarbonTarget> = {}): CarbonTarget {
+  return {
+    targetId: crypto.randomUUID(),
+    name: "Net Zero 2030",
+    baseYear: 2024,
+    baseYearEmissionsGrams: 1000000,
+    targetYear: 2030,
+    targetReductionPercent: 50,
+    pathway: "1.5C",
+    createdAt: Date.now(),
     ...overrides,
   };
 }
@@ -416,6 +434,162 @@ describe("green API handler", () => {
       const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/green/summary///");
       await handler(req, res);
       expect(getStatus()).toBe(200);
+    });
+  });
+
+  describe("GET /intensity", () => {
+    it("returns intensity metrics for empty DB", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/intensity",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.totalTokens).toBe(0);
+      expect(data.totalTraces).toBe(0);
+      expect(data.intensityPerMillionTokens).toBe(0);
+      expect(data.intensityPerQuery).toBe(0);
+      expect(data.uncertainty).toBeDefined();
+    });
+
+    it("returns intensity metrics with data", async () => {
+      insertCarbonTrace(db, makeTrace({ inputTokens: 1_000_000, totalCo2Grams: 100 }));
+
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/green/intensity");
+      await handler(req, res);
+      const data = JSON.parse(getBody());
+
+      expect(data.totalTraces).toBe(1);
+      expect(data.intensityPerMillionTokens).toBeGreaterThan(0);
+      expect(data.uncertainty.lower).toBeLessThan(1);
+      expect(data.uncertainty.upper).toBeGreaterThan(1);
+    });
+  });
+
+  describe("GET /targets", () => {
+    it("returns empty targets for empty DB", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes("GET", "/__openclaw__/api/green/targets");
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.targets).toEqual([]);
+      expect(data.progress).toEqual([]);
+    });
+
+    it("returns targets with progress", async () => {
+      const target = makeTarget();
+      insertCarbonTarget(db, target);
+
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/green/targets");
+      await handler(req, res);
+      const data = JSON.parse(getBody());
+
+      expect(data.targets).toHaveLength(1);
+      expect(data.targets[0].name).toBe(target.name);
+      expect(data.progress).toHaveLength(1);
+    });
+  });
+
+  describe("GET /export/ghg-protocol", () => {
+    it("returns GHG Protocol export", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/export/ghg-protocol?period=2025-Q1",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.reportingPeriod).toBe("2025-Q1");
+      expect(data.organizationalBoundary).toBeDefined();
+      expect(data.scope3Category1).toBeDefined();
+    });
+
+    it("uses current year as default period", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/export/ghg-protocol",
+      );
+      await handler(req, res);
+      const data = JSON.parse(getBody());
+
+      expect(data.reportingPeriod).toBe(String(new Date().getFullYear()));
+    });
+  });
+
+  describe("GET /export/cdp", () => {
+    it("returns CDP export", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/export/cdp?year=2025",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.reportingYear).toBe(2025);
+      expect(data.scope3).toBeDefined();
+      expect(data.scope3.category1).toBeDefined();
+      expect(data.intensity).toBeDefined();
+    });
+  });
+
+  describe("GET /export/tcfd", () => {
+    it("returns TCFD export", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/export/tcfd?period=2025&baseYear=2024",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.absoluteEmissions).toBeDefined();
+      expect(data.carbonIntensity).toBeDefined();
+      expect(data.historicalTrend).toBeDefined();
+    });
+
+    it("works without optional parameters", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/green/export/tcfd");
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+    });
+  });
+
+  describe("GET /export/iso14064", () => {
+    it("returns ISO 14064 export", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/export/iso14064?period=2025&baseYear=2024",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+
+      expect(data.reportingPeriod).toBe("2025");
+      expect(data.organizationalBoundary).toBeDefined();
+      expect(data.ghgInventory).toBeDefined();
+      expect(data.ghgInventory.uncertainty).toBeDefined();
     });
   });
 });

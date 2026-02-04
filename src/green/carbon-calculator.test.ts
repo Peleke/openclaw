@@ -4,6 +4,11 @@ import {
   calculateCarbon,
   calculateEquivalents,
   formatConfidence,
+  confidenceToUncertainty,
+  sourceToCalculationMethod,
+  confidenceToDataQuality,
+  formatDataQuality,
+  formatCalculationMethod,
 } from "./carbon-calculator.js";
 import { FALLBACK_CARBON_FACTOR } from "./config.js";
 
@@ -333,6 +338,144 @@ describe("carbon-calculator", () => {
     it("handles edge case at 0.3 boundary", () => {
       expect(formatConfidence(0.3).label).toBe("low");
       expect(formatConfidence(0.299).label).toBe("very_low");
+    });
+  });
+
+  describe("confidenceToUncertainty", () => {
+    it("returns ±15% for high confidence (>=0.7)", () => {
+      const result = confidenceToUncertainty(0.8);
+      expect(result.lower).toBe(0.85);
+      expect(result.upper).toBe(1.15);
+    });
+
+    it("returns ±30% for medium confidence (0.5-0.69)", () => {
+      const result = confidenceToUncertainty(0.6);
+      expect(result.lower).toBe(0.7);
+      expect(result.upper).toBe(1.3);
+    });
+
+    it("returns ±50% for low confidence (0.3-0.49)", () => {
+      const result = confidenceToUncertainty(0.4);
+      expect(result.lower).toBe(0.5);
+      expect(result.upper).toBe(1.5);
+    });
+
+    it("returns ±100% for very low confidence (<0.3)", () => {
+      const result = confidenceToUncertainty(0.1);
+      expect(result.lower).toBe(0.0);
+      expect(result.upper).toBe(2.0);
+    });
+
+    it("handles boundary at 0.7", () => {
+      expect(confidenceToUncertainty(0.7).lower).toBe(0.85);
+      expect(confidenceToUncertainty(0.699).lower).toBe(0.7);
+    });
+
+    it("handles boundary at 0.5", () => {
+      expect(confidenceToUncertainty(0.5).lower).toBe(0.7);
+      expect(confidenceToUncertainty(0.499).lower).toBe(0.5);
+    });
+
+    it("handles boundary at 0.3", () => {
+      expect(confidenceToUncertainty(0.3).lower).toBe(0.5);
+      expect(confidenceToUncertainty(0.299).lower).toBe(0.0);
+    });
+  });
+
+  describe("sourceToCalculationMethod", () => {
+    it("maps measured to supplier-specific", () => {
+      expect(sourceToCalculationMethod("measured")).toBe("supplier-specific");
+    });
+
+    it("maps research to hybrid", () => {
+      expect(sourceToCalculationMethod("research")).toBe("hybrid");
+    });
+
+    it("maps estimated to average-data", () => {
+      expect(sourceToCalculationMethod("estimated")).toBe("average-data");
+    });
+
+    it("maps fallback to average-data", () => {
+      expect(sourceToCalculationMethod("fallback")).toBe("average-data");
+    });
+  });
+
+  describe("confidenceToDataQuality", () => {
+    it("returns 1 for very high confidence (>=0.8)", () => {
+      expect(confidenceToDataQuality(0.9)).toBe(1);
+      expect(confidenceToDataQuality(0.8)).toBe(1);
+    });
+
+    it("returns 2 for high confidence (0.6-0.79)", () => {
+      expect(confidenceToDataQuality(0.7)).toBe(2);
+      expect(confidenceToDataQuality(0.6)).toBe(2);
+    });
+
+    it("returns 3 for medium confidence (0.4-0.59)", () => {
+      expect(confidenceToDataQuality(0.5)).toBe(3);
+      expect(confidenceToDataQuality(0.4)).toBe(3);
+    });
+
+    it("returns 4 for low confidence (0.2-0.39)", () => {
+      expect(confidenceToDataQuality(0.3)).toBe(4);
+      expect(confidenceToDataQuality(0.2)).toBe(4);
+    });
+
+    it("returns 5 for very low confidence (<0.2)", () => {
+      expect(confidenceToDataQuality(0.1)).toBe(5);
+      expect(confidenceToDataQuality(0.0)).toBe(5);
+    });
+  });
+
+  describe("formatDataQuality", () => {
+    it("formats score 1 as Excellent", () => {
+      const result = formatDataQuality(1);
+      expect(result.label).toBe("Excellent");
+      expect(result.description).toContain("Primary data");
+    });
+
+    it("formats score 2 as Good", () => {
+      const result = formatDataQuality(2);
+      expect(result.label).toBe("Good");
+    });
+
+    it("formats score 3 as Fair", () => {
+      const result = formatDataQuality(3);
+      expect(result.label).toBe("Fair");
+    });
+
+    it("formats score 4 as Poor", () => {
+      const result = formatDataQuality(4);
+      expect(result.label).toBe("Poor");
+    });
+
+    it("formats score 5 as Very Poor", () => {
+      const result = formatDataQuality(5);
+      expect(result.label).toBe("Very Poor");
+      expect(result.description).toContain("Highly uncertain");
+    });
+  });
+
+  describe("formatCalculationMethod", () => {
+    it("formats supplier-specific method", () => {
+      const result = formatCalculationMethod("supplier-specific");
+      expect(result).toContain("Supplier-specific");
+      expect(result).toContain("primary data");
+    });
+
+    it("formats hybrid method", () => {
+      const result = formatCalculationMethod("hybrid");
+      expect(result).toContain("Hybrid");
+    });
+
+    it("formats average-data method", () => {
+      const result = formatCalculationMethod("average-data");
+      expect(result).toContain("Average-data");
+    });
+
+    it("formats spend-based method", () => {
+      const result = formatCalculationMethod("spend-based");
+      expect(result).toContain("Spend-based");
     });
   });
 });

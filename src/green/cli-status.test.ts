@@ -29,6 +29,10 @@ function makeTrace(overrides: Partial<CarbonTrace> = {}): CarbonTrace {
     factorConfidence: 0.3,
     factorSource: "estimated",
     gridCarbonUsed: 400,
+    scope: 3,
+    category: 1,
+    calculationMethod: "average-data",
+    dataQualityScore: 3,
     aborted: false,
     ...overrides,
   };

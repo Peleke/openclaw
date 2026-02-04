@@ -2,7 +2,12 @@
  * Carbon footprint calculation from token usage.
  */
 
-import type { CarbonFactor } from "./types.js";
+import type {
+  CarbonFactor,
+  CarbonFactorSource,
+  GhgCalculationMethod,
+  GhgDataQualityScore,
+} from "./types.js";
 import { DEFAULT_CARBON_FACTORS, FALLBACK_CARBON_FACTOR } from "./config.js";
 
 export type TokenUsage = {
@@ -115,4 +120,82 @@ export function formatConfidence(confidence: number): {
     return { label: "low", description: "Estimated from similar models" };
   }
   return { label: "very_low", description: "Fallback estimate" };
+}
+
+// -- ISO 14064 / GHG Protocol Compliance Functions --
+
+/**
+ * Convert confidence level to ISO 14064 uncertainty bounds.
+ * Returns multipliers for lower and upper bounds.
+ */
+export function confidenceToUncertainty(confidence: number): { lower: number; upper: number } {
+  if (confidence >= 0.7) return { lower: 0.85, upper: 1.15 }; // ±15%
+  if (confidence >= 0.5) return { lower: 0.7, upper: 1.3 }; // ±30%
+  if (confidence >= 0.3) return { lower: 0.5, upper: 1.5 }; // ±50%
+  return { lower: 0.0, upper: 2.0 }; // ±100%
+}
+
+/**
+ * Map carbon factor source to GHG Protocol calculation method.
+ */
+export function sourceToCalculationMethod(source: CarbonFactorSource): GhgCalculationMethod {
+  switch (source) {
+    case "measured":
+      return "supplier-specific";
+    case "research":
+      return "hybrid";
+    case "estimated":
+      return "average-data";
+    case "fallback":
+      return "average-data";
+  }
+}
+
+/**
+ * Map confidence to GHG Protocol data quality score (1-5, lower is better).
+ * Based on GHG Protocol Corporate Standard data quality criteria.
+ */
+export function confidenceToDataQuality(confidence: number): GhgDataQualityScore {
+  if (confidence >= 0.8) return 1; // Primary data, verified
+  if (confidence >= 0.6) return 2; // Published secondary data
+  if (confidence >= 0.4) return 3; // Average secondary data
+  if (confidence >= 0.2) return 4; // Estimated, unverified
+  return 5; // Highly uncertain / proxy data
+}
+
+/**
+ * Format data quality score for display.
+ */
+export function formatDataQuality(score: GhgDataQualityScore): {
+  label: string;
+  description: string;
+} {
+  switch (score) {
+    case 1:
+      return { label: "Excellent", description: "Primary data, verified" };
+    case 2:
+      return { label: "Good", description: "Published secondary data" };
+    case 3:
+      return { label: "Fair", description: "Average secondary data" };
+    case 4:
+      return { label: "Poor", description: "Estimated, unverified" };
+    case 5:
+      return { label: "Very Poor", description: "Highly uncertain / proxy data" };
+  }
+}
+
+/**
+ * Format calculation method for display.
+ */
+export function formatCalculationMethod(method: GhgCalculationMethod): string {
+  switch (method) {
+    case "supplier-specific":
+      return "Supplier-specific method (primary data)";
+    case "hybrid":
+      return "Hybrid method (primary + secondary data)";
+    case "average-data":
+      return "Average-data method (secondary data)";
+    case "spend-based":
+      return "Spend-based method (financial data)";
+  }
 }

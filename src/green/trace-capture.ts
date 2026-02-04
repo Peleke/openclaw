@@ -5,7 +5,11 @@
 import crypto from "node:crypto";
 import type { NormalizedUsage } from "../agents/usage.js";
 import type { CarbonTrace } from "./types.js";
-import { calculateCarbon } from "./carbon-calculator.js";
+import {
+  calculateCarbon,
+  sourceToCalculationMethod,
+  confidenceToDataQuality,
+} from "./carbon-calculator.js";
 import { insertCarbonTrace, openGreenDb } from "./store.js";
 import { log } from "./logger.js";
 
@@ -57,6 +61,11 @@ export function captureGreenTrace(params: CaptureGreenTraceParams): CarbonTrace 
     factorConfidence: calc.factor.confidence,
     factorSource: calc.factor.source,
     gridCarbonUsed: params.gridCarbon ?? 400,
+    // GHG Protocol compliance fields
+    scope: 3 as const, // Always Scope 3 for API consumers
+    category: 1 as const, // Category 1: Purchased Goods and Services
+    calculationMethod: sourceToCalculationMethod(calc.factor.source),
+    dataQualityScore: confidenceToDataQuality(calc.factor.confidence),
     durationMs: params.durationMs,
     aborted: params.aborted,
     error: params.error,

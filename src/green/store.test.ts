@@ -11,8 +11,15 @@ import {
   getCarbonSummary,
   getProviderBreakdown,
   getCarbonTimeseries,
+  getCarbonSummaryForPeriod,
+  getEmissionsForYear,
+  insertCarbonTarget,
+  listCarbonTargets,
+  getCarbonTarget,
+  deleteCarbonTarget,
+  getTargetProgress,
 } from "./store.js";
-import type { CarbonTrace } from "./types.js";
+import type { CarbonTrace, CarbonTarget } from "./types.js";
 
 let db: DatabaseSync;
 let tmpDir: string;
@@ -36,7 +43,25 @@ function makeTrace(overrides: Partial<CarbonTrace> = {}): CarbonTrace {
     factorConfidence: 0.3,
     factorSource: "estimated",
     gridCarbonUsed: 400,
+    scope: 3,
+    category: 1,
+    calculationMethod: "average-data",
+    dataQualityScore: 3,
     aborted: false,
+    ...overrides,
+  };
+}
+
+function makeTarget(overrides: Partial<CarbonTarget> = {}): CarbonTarget {
+  return {
+    targetId: crypto.randomUUID(),
+    name: "Net Zero 2030",
+    baseYear: 2024,
+    baseYearEmissionsGrams: 1000000,
+    targetYear: 2030,
+    targetReductionPercent: 50,
+    pathway: "1.5C",
+    createdAt: Date.now(),
     ...overrides,
   };
 }
@@ -401,6 +426,283 @@ describe("green store", () => {
 
       // Day buckets should have fewer entries
       expect(dayBuckets.length).toBeLessThanOrEqual(hourBuckets.length);
+    });
+  });
+
+  describe("getCarbonSummaryForPeriod", () => {
+    it("filters by date range", () => {
+      const jan = new Date(2025, 0, 15).getTime();
+      const feb = new Date(2025, 1, 15).getTime();
+      const mar = new Date(2025, 2, 15).getTime();
+
+      insertCarbonTrace(db, makeTrace({ timestamp: jan, totalCo2Grams: 100 }));
+      insertCarbonTrace(db, makeTrace({ timestamp: feb, totalCo2Grams: 200 }));
+      insertCarbonTrace(db, makeTrace({ timestamp: mar, totalCo2Grams: 300 }));
+
+      const janOnly = getCarbonSummaryForPeriod(
+        db,
+        new Date(2025, 0, 1).getTime(),
+        new Date(2025, 0, 31).getTime(),
+      );
+      expect(janOnly.traceCount).toBe(1);
+      expect(janOnly.totalCo2Grams).toBe(100);
+
+      const janFeb = getCarbonSummaryForPeriod(
+        db,
+        new Date(2025, 0, 1).getTime(),
+        new Date(2025, 1, 28).getTime(),
+      );
+      expect(janFeb.traceCount).toBe(2);
+      expect(janFeb.totalCo2Grams).toBe(300);
+    });
+
+    it("calculates intensity metrics", () => {
+      insertCarbonTrace(
+        db,
+        makeTrace({ inputTokens: 1_000_000, outputTokens: 500_000, totalCo2Grams: 100 }),
+      );
+
+      const summary = getCarbonSummaryForPeriod(db, 0, Date.now());
+
+      expect(summary.totalTokens).toBe(1_500_000);
+      expect(summary.intensityPerMillionTokens).toBeCloseTo(66.67, 1);
+      expect(summary.intensityPerQuery).toBe(100);
+    });
+
+    it("handles empty period", () => {
+      const futureStart = Date.now() + 86400000 * 365;
+      const summary = getCarbonSummaryForPeriod(db, futureStart, futureStart + 86400000);
+
+      expect(summary.traceCount).toBe(0);
+      expect(summary.totalCo2Grams).toBe(0);
+      expect(summary.intensityPerMillionTokens).toBe(0);
+    });
+  });
+
+  describe("getEmissionsForYear", () => {
+    it("returns emissions for a specific year", () => {
+      const ts2024 = new Date(2024, 6, 1).getTime();
+      const ts2025 = new Date(2025, 6, 1).getTime();
+
+      insertCarbonTrace(db, makeTrace({ timestamp: ts2024, totalCo2Grams: 1000 }));
+      insertCarbonTrace(db, makeTrace({ timestamp: ts2025, totalCo2Grams: 500 }));
+
+      expect(getEmissionsForYear(db, 2024)).toBe(1000);
+      expect(getEmissionsForYear(db, 2025)).toBe(500);
+      expect(getEmissionsForYear(db, 2023)).toBe(0);
+    });
+  });
+
+  describe("carbon targets", () => {
+    describe("insertCarbonTarget / listCarbonTargets", () => {
+      it("inserts and retrieves targets", () => {
+        const target = makeTarget();
+        insertCarbonTarget(db, target);
+
+        const targets = listCarbonTargets(db);
+        expect(targets).toHaveLength(1);
+        expect(targets[0].targetId).toBe(target.targetId);
+        expect(targets[0].name).toBe(target.name);
+        expect(targets[0].pathway).toBe(target.pathway);
+      });
+
+      it("stores all target fields", () => {
+        const target = makeTarget({
+          targetId: "test-target-123",
+          name: "SBTi Aligned 2030",
+          baseYear: 2023,
+          baseYearEmissionsGrams: 5000000,
+          targetYear: 2035,
+          targetReductionPercent: 42,
+          pathway: "well-below-2C",
+          createdAt: 1700000000000,
+        });
+        insertCarbonTarget(db, target);
+
+        const loaded = getCarbonTarget(db, "test-target-123");
+        expect(loaded).not.toBeNull();
+        expect(loaded?.name).toBe("SBTi Aligned 2030");
+        expect(loaded?.baseYear).toBe(2023);
+        expect(loaded?.baseYearEmissionsGrams).toBe(5000000);
+        expect(loaded?.targetYear).toBe(2035);
+        expect(loaded?.targetReductionPercent).toBe(42);
+        expect(loaded?.pathway).toBe("well-below-2C");
+        expect(loaded?.createdAt).toBe(1700000000000);
+      });
+
+      it("orders targets by created_at descending", () => {
+        insertCarbonTarget(db, makeTarget({ targetId: "t1", createdAt: 1000 }));
+        insertCarbonTarget(db, makeTarget({ targetId: "t2", createdAt: 3000 }));
+        insertCarbonTarget(db, makeTarget({ targetId: "t3", createdAt: 2000 }));
+
+        const targets = listCarbonTargets(db);
+        expect(targets[0].targetId).toBe("t2");
+        expect(targets[1].targetId).toBe("t3");
+        expect(targets[2].targetId).toBe("t1");
+      });
+
+      it("upserts on duplicate targetId", () => {
+        insertCarbonTarget(db, makeTarget({ targetId: "dup", name: "First" }));
+        insertCarbonTarget(db, makeTarget({ targetId: "dup", name: "Second" }));
+
+        const targets = listCarbonTargets(db);
+        expect(targets).toHaveLength(1);
+        expect(targets[0].name).toBe("Second");
+      });
+    });
+
+    describe("getCarbonTarget", () => {
+      it("returns null for non-existent target", () => {
+        expect(getCarbonTarget(db, "nonexistent")).toBeNull();
+      });
+
+      it("returns target by ID", () => {
+        const target = makeTarget({ targetId: "find-me" });
+        insertCarbonTarget(db, target);
+
+        const found = getCarbonTarget(db, "find-me");
+        expect(found).not.toBeNull();
+        expect(found?.targetId).toBe("find-me");
+      });
+    });
+
+    describe("deleteCarbonTarget", () => {
+      it("deletes existing target", () => {
+        insertCarbonTarget(db, makeTarget({ targetId: "delete-me" }));
+        expect(listCarbonTargets(db)).toHaveLength(1);
+
+        const deleted = deleteCarbonTarget(db, "delete-me");
+        expect(deleted).toBe(true);
+        expect(listCarbonTargets(db)).toHaveLength(0);
+      });
+
+      it("returns false for non-existent target", () => {
+        const deleted = deleteCarbonTarget(db, "nonexistent");
+        expect(deleted).toBe(false);
+      });
+    });
+
+    describe("getTargetProgress", () => {
+      it("returns null for non-existent target", () => {
+        expect(getTargetProgress(db, "nonexistent")).toBeNull();
+      });
+
+      it("calculates progress correctly", () => {
+        const target = makeTarget({
+          baseYear: 2020,
+          baseYearEmissionsGrams: 1000,
+          targetYear: 2030,
+          targetReductionPercent: 50,
+        });
+        insertCarbonTarget(db, target);
+
+        // Add current year emissions
+        const currentYear = new Date().getFullYear();
+        const ts = new Date(currentYear, 6, 1).getTime();
+        insertCarbonTrace(db, makeTrace({ timestamp: ts, totalCo2Grams: 600 }));
+
+        const progress = getTargetProgress(db, target.targetId);
+        expect(progress).not.toBeNull();
+        expect(progress?.currentYearEmissionsGrams).toBe(600);
+        expect(progress?.progressPercent).toBeGreaterThan(0);
+      });
+
+      it("determines on-track status", () => {
+        // Create a target with 50% reduction
+        const target = makeTarget({
+          baseYear: 2020,
+          baseYearEmissionsGrams: 1000,
+          targetYear: 2030,
+          targetReductionPercent: 50,
+        });
+        insertCarbonTarget(db, target);
+
+        const currentYear = new Date().getFullYear();
+        const ts = new Date(currentYear, 6, 1).getTime();
+
+        // If current emissions are low, we should be on track
+        insertCarbonTrace(db, makeTrace({ timestamp: ts, totalCo2Grams: 100 }));
+
+        const progress = getTargetProgress(db, target.targetId);
+        expect(progress?.onTrack).toBeDefined();
+      });
+    });
+  });
+
+  describe("GHG Protocol fields in traces", () => {
+    it("stores and retrieves GHG Protocol fields", () => {
+      const trace = makeTrace({
+        scope: 3,
+        category: 1,
+        calculationMethod: "supplier-specific",
+        dataQualityScore: 2,
+        region: "us-east-1",
+        regionGridCarbon: 350,
+      });
+      insertCarbonTrace(db, trace);
+
+      const { traces } = listCarbonTraces(db);
+      expect(traces[0].scope).toBe(3);
+      expect(traces[0].category).toBe(1);
+      expect(traces[0].calculationMethod).toBe("supplier-specific");
+      expect(traces[0].dataQualityScore).toBe(2);
+      expect(traces[0].region).toBe("us-east-1");
+      expect(traces[0].regionGridCarbon).toBe(350);
+    });
+
+    it("handles optional regional fields", () => {
+      const trace = makeTrace({
+        region: undefined,
+        regionGridCarbon: undefined,
+      });
+      insertCarbonTrace(db, trace);
+
+      const { traces } = listCarbonTraces(db);
+      expect(traces[0].region).toBeUndefined();
+      expect(traces[0].regionGridCarbon).toBeUndefined();
+    });
+  });
+
+  describe("getCarbonSummary with intensity metrics", () => {
+    it("includes total tokens", () => {
+      insertCarbonTrace(
+        db,
+        makeTrace({ inputTokens: 1000, outputTokens: 500, cacheReadTokens: 200 }),
+      );
+
+      const summary = getCarbonSummary(db);
+      expect(summary.totalTokens).toBe(1700);
+    });
+
+    it("calculates intensity per million tokens", () => {
+      insertCarbonTrace(
+        db,
+        makeTrace({
+          inputTokens: 1_000_000,
+          outputTokens: 0,
+          cacheReadTokens: 0,
+          totalCo2Grams: 150,
+        }),
+      );
+
+      const summary = getCarbonSummary(db);
+      expect(summary.intensityPerMillionTokens).toBeCloseTo(150, 0);
+    });
+
+    it("calculates intensity per query", () => {
+      insertCarbonTrace(db, makeTrace({ totalCo2Grams: 10 }));
+      insertCarbonTrace(db, makeTrace({ totalCo2Grams: 20 }));
+
+      const summary = getCarbonSummary(db);
+      expect(summary.intensityPerQuery).toBe(15); // (10 + 20) / 2
+    });
+
+    it("includes uncertainty bounds", () => {
+      insertCarbonTrace(db, makeTrace({ factorConfidence: 0.3 }));
+
+      const summary = getCarbonSummary(db);
+      expect(summary.uncertaintyLower).toBeLessThan(1);
+      expect(summary.uncertaintyUpper).toBeGreaterThan(1);
     });
   });
 });

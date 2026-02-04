@@ -4,8 +4,18 @@
 
 import type { DatabaseSync } from "node:sqlite";
 import type { GreenConfig } from "./types.js";
-import { getCarbonSummary, getProviderBreakdown } from "./store.js";
-import { calculateEquivalents, formatConfidence } from "./carbon-calculator.js";
+import {
+  getCarbonSummary,
+  getProviderBreakdown,
+  listCarbonTargets,
+  getTargetProgress,
+} from "./store.js";
+import {
+  calculateEquivalents,
+  formatConfidence,
+  confidenceToDataQuality,
+  formatDataQuality,
+} from "./carbon-calculator.js";
 import { renderTable, type TableColumn } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
 import { resolveGreenConfig } from "./config.js";
@@ -98,6 +108,42 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
     }));
 
     lines.push(renderTable({ columns: cols, rows }));
+  }
+
+  // TCFD Intensity Metrics
+  if (summary.totalTokens > 0) {
+    lines.push("");
+    lines.push(theme.heading("Intensity Metrics (TCFD)"));
+    lines.push(
+      `  Per 1M tokens: ${theme.accent(summary.intensityPerMillionTokens.toFixed(2))} gCO\u2082eq    Per query: ${theme.accent(summary.intensityPerQuery.toFixed(4))} gCO\u2082eq`,
+    );
+
+    // Data quality indicator
+    const dqScore = confidenceToDataQuality(summary.avgConfidence);
+    const dq = formatDataQuality(dqScore);
+    lines.push(
+      `  Data quality: ${theme.muted(`${dqScore}/5 (${dq.label})`)}    Uncertainty: ${theme.muted(`\u00B1${(((summary.uncertaintyUpper - summary.uncertaintyLower) / 2) * 100).toFixed(0)}%`)}`,
+    );
+  }
+
+  // SBTi Targets
+  const targets = listCarbonTargets(db);
+  if (targets.length > 0) {
+    lines.push("");
+    lines.push(theme.heading("Emission Targets (SBTi)"));
+
+    for (const target of targets.slice(0, 3)) {
+      const progress = getTargetProgress(db, target.targetId);
+      const statusIcon = progress?.onTrack ? "\u2713" : "\u26A0";
+      const statusColor = progress?.onTrack ? theme.success : theme.warn;
+      const progressPct = progress?.progressPercent.toFixed(0) ?? "?";
+      lines.push(
+        `  ${statusColor(statusIcon)} ${target.name}: ${progressPct}% toward ${target.targetReductionPercent}% reduction by ${target.targetYear}`,
+      );
+    }
+    if (targets.length > 3) {
+      lines.push(theme.muted(`  ... and ${targets.length - 3} more targets`));
+    }
   }
 
   return lines.join("\n");
