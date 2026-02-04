@@ -51,6 +51,8 @@ import {
   rotateDeviceToken,
 } from "./controllers/devices";
 import { renderSkills } from "./views/skills";
+import { renderLearning } from "./views/learning";
+import { renderGreen } from "./views/green";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers";
 import { loadChannels } from "./controllers/channels";
 import { loadPresence } from "./controllers/presence";
@@ -424,6 +426,18 @@ export function renderApp(state: AppViewState) {
                 return saveExecApprovals(state, target);
               },
             })
+          : nothing}
+
+        ${state.tab === "learning"
+          ? renderLearning(
+              state.learningState,
+              () => state.loadLearning(),
+              () => window.open(state.learningState.dashboardUrl, "_blank"),
+            )
+          : nothing}
+
+        ${state.tab === "green"
+          ? renderGreen(state.greenState, () => state.loadGreen())
           : nothing}
 
         ${state.tab === "chat"

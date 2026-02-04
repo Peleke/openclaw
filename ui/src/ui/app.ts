@@ -78,6 +78,12 @@ import {
 } from "./app-channels";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity";
+import {
+  type LearningState,
+  createLearningState,
+  loadLearningData,
+} from "./controllers/learning";
+import { type GreenState, createGreenState, loadGreenData } from "./controllers/green";
 
 declare global {
   interface Window {
@@ -247,6 +253,16 @@ export class OpenClawApp extends LitElement {
   @state() logsMaxBytes = 250_000;
   @state() logsAtBottom = true;
 
+  // Learning layer state
+  @state() learningState: LearningState = createLearningState(
+    `${window.__OPENCLAW_CONTROL_UI_BASE_PATH__ ?? ""}/__openclaw__/api/learning`,
+  );
+
+  // Green layer state
+  @state() greenState: GreenState = createGreenState(
+    `${window.__OPENCLAW_CONTROL_UI_BASE_PATH__ ?? ""}/__openclaw__/api/green`,
+  );
+
   client: GatewayBrowserClient | null = null;
   private chatScrollFrame: number | null = null;
   private chatScrollTimeout: number | null = null;
@@ -362,6 +378,16 @@ export class OpenClawApp extends LitElement {
     await loadCronInternal(
       this as unknown as Parameters<typeof loadCronInternal>[0],
     );
+  }
+
+  async loadLearning() {
+    await loadLearningData(this.learningState);
+    this.requestUpdate();
+  }
+
+  async loadGreen() {
+    await loadGreenData(this.greenState);
+    this.requestUpdate();
   }
 
   async handleAbortChat() {
