@@ -3,6 +3,7 @@ site_url: https://peleke.github.io/openclaw/green/
 site_description: Environmental Impact Tracking for AI Inference
 repo_url: https://github.com/Peleke/openclaw
 repo_name: Peleke/openclaw
+docs_dir: green
 
 theme:
   name: material
