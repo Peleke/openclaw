@@ -160,7 +160,7 @@ export function captureAndStoreTrace(params: {
     log.debug(`learning: captured trace ${trace.traceId} (${trace.arms.length} arms)`);
     return trace;
   } catch (err) {
-    log.debug(`learning: trace capture failed: ${err}`);
+    log.debug(`learning: trace capture failed: ${String(err)}`);
     return null;
   }
 }
