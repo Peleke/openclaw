@@ -5,7 +5,7 @@ import os from "node:os";
 import type { DatabaseSync } from "node:sqlite";
 import { ensureLearningSchema, insertRunTrace, savePosterior } from "./store.js";
 import { formatLearningStatus } from "./cli-status.js";
-import type { RunTrace } from "./types.js";
+import type { RunTrace, LearningConfig } from "./types.js";
 
 let db: DatabaseSync;
 let tmpDir: string;
@@ -74,5 +74,56 @@ describe("formatLearningStatus", () => {
     const output = formatLearningStatus(db);
     expect(output).toContain("Top Arms");
     expect(output).toContain("Bottom Arms");
+  });
+
+  it("shows phase badge in output", () => {
+    const config: LearningConfig = { enabled: true, phase: "active" };
+    const output = formatLearningStatus({ db, config });
+    expect(output).toContain("[ACTIVE]");
+  });
+
+  it("shows passive phase by default", () => {
+    const output = formatLearningStatus({ db });
+    expect(output).toContain("[PASSIVE]");
+  });
+
+  it("shows config info when provided", () => {
+    const config: LearningConfig = {
+      enabled: true,
+      phase: "active",
+      tokenBudget: 4000,
+      baselineRate: 0.2,
+      minPulls: 10,
+    };
+    const output = formatLearningStatus({ db, config });
+    expect(output).toContain("Budget: 4,000");
+    expect(output).toContain("Baseline: 20%");
+    expect(output).toContain("Min pulls: 10");
+  });
+
+  it("shows run distribution with baseline/selected counts", () => {
+    insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
+    insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1200 } }));
+    insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
+
+    const output = formatLearningStatus({ db });
+    expect(output).toContain("Run Distribution");
+    expect(output).toContain("Baseline:");
+    expect(output).toContain("Selected:");
+  });
+
+  it("shows token savings percentage", () => {
+    insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
+    insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
+
+    const output = formatLearningStatus({ db });
+    expect(output).toContain("Token Savings:");
+    expect(output).toContain("20.0%");
+  });
+
+  it("supports legacy signature with just db", () => {
+    insertRunTrace(db, makeTrace());
+    const output = formatLearningStatus(db);
+    expect(output).toContain("Learning Layer Status");
   });
 });
