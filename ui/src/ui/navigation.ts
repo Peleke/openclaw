@@ -6,7 +6,7 @@ export const TAB_GROUPS = [
     label: "Control",
     tabs: ["overview", "channels", "instances", "sessions", "cron"],
   },
-  { label: "Agent", tabs: ["skills", "nodes"] },
+  { label: "Agent", tabs: ["skills", "nodes", "learning"] },
   { label: "Settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
@@ -18,6 +18,7 @@ export type Tab =
   | "cron"
   | "skills"
   | "nodes"
+  | "learning"
   | "chat"
   | "config"
   | "debug"
@@ -31,6 +32,7 @@ const TAB_PATHS: Record<Tab, string> = {
   cron: "/cron",
   skills: "/skills",
   nodes: "/nodes",
+  learning: "/learning",
   chat: "/chat",
   config: "/config",
   debug: "/debug",
@@ -118,6 +120,8 @@ export function iconForTab(tab: Tab): IconName {
       return "zap";
     case "nodes":
       return "monitor";
+    case "learning":
+      return "brain";
     case "config":
       return "settings";
     case "debug":
@@ -145,6 +149,8 @@ export function titleForTab(tab: Tab) {
       return "Skills";
     case "nodes":
       return "Nodes";
+    case "learning":
+      return "Learning";
     case "chat":
       return "Chat";
     case "config":
@@ -174,6 +180,8 @@ export function subtitleForTab(tab: Tab) {
       return "Manage skill availability and API key injection.";
     case "nodes":
       return "Paired devices, capabilities, and command exposure.";
+    case "learning":
+      return "Thompson Sampling bandit for active prompt optimization.";
     case "chat":
       return "Direct gateway chat session for quick interventions.";
     case "config":
