@@ -6,7 +6,7 @@
 import crypto from "node:crypto";
 import type { SessionSystemPromptReport } from "../config/sessions/types.js";
 import type { NormalizedUsage } from "../agents/usage.js";
-import type { RunTrace, ArmOutcome, Arm } from "./types.js";
+import type { RunTrace, ArmOutcome, Arm, SelectionResult } from "./types.js";
 import { buildArmId } from "./types.js";
 import { detectReference } from "./reference-detection.js";
 import { insertRunTrace, openLearningDb } from "./store.js";
@@ -78,12 +78,18 @@ export function captureRunTrace(params: {
   isBaseline: boolean;
   aborted: boolean;
   error?: string;
+  /** Optional selection result for active learning mode. */
+  selection?: SelectionResult;
 }): RunTrace {
   const arms = extractArms(params.report);
 
+  // In active mode, use selection to determine included status
+  // In passive mode (no selection), all arms are included
+  const selectedSet = params.selection ? new Set(params.selection.selectedArms) : null;
+
   const armOutcomes: ArmOutcome[] = arms.map((arm) => ({
     armId: arm.id,
-    included: true, // In passive phase, all arms are included
+    included: selectedSet ? selectedSet.has(arm.id) : true,
     referenced: detectReference({
       armId: arm.id,
       armType: arm.type,
@@ -140,6 +146,8 @@ export function captureAndStoreTrace(params: {
   aborted: boolean;
   error?: string;
   agentDir: string;
+  /** Optional selection result for active learning mode. */
+  selection?: SelectionResult;
 }): RunTrace | null {
   try {
     const trace = captureRunTrace(params);

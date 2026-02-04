@@ -6,6 +6,7 @@ import type { ReasoningLevel, ThinkLevel, VerboseLevel } from "../../../auto-rep
 import type { OpenClawConfig } from "../../../config/config.js";
 import type { AgentStreamParams } from "../../../commands/agent/types.js";
 import type { ExecElevatedDefaults, ExecToolDefaults } from "../../bash-tools.js";
+import type { SelectionResult } from "../../../learning/types.js";
 import type { MessagingToolSend } from "../../pi-embedded-messaging.js";
 import type { BlockReplyChunking, ToolResultFormat } from "../../pi-embedded-subscribe.js";
 import type { SkillSnapshot } from "../../skills.js";
@@ -102,4 +103,6 @@ export type EmbeddedRunAttemptResult = {
   cloudCodeAssistFormatError: boolean;
   /** Client tool call detected (OpenResponses hosted tools). */
   clientToolCall?: { name: string; params: Record<string, unknown> };
+  /** Learning layer selection result (active mode only). */
+  learningSelection?: SelectionResult;
 };

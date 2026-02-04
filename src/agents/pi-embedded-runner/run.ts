@@ -44,6 +44,8 @@ import {
 import { normalizeUsage, type UsageLike } from "../usage.js";
 
 import { captureAndStoreTrace } from "../../learning/trace-capture.js";
+import { openLearningDb } from "../../learning/store.js";
+import { updatePosteriors } from "../../learning/update.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
@@ -648,9 +650,12 @@ export async function runEmbeddedPiAgent(
               agentDir: params.agentDir,
             });
           }
-          // Learning layer: passive trace capture
+          // Learning layer: trace capture and posterior update
           if (params.config?.learning?.enabled && attempt.systemPromptReport) {
-            captureAndStoreTrace({
+            // Determine if this is a baseline run (no active selection or selection says baseline)
+            const isBaseline = attempt.learningSelection?.isBaseline ?? true;
+
+            const trace = captureAndStoreTrace({
               runId: params.runId,
               sessionId: params.sessionId,
               sessionKey: params.sessionKey,
@@ -662,10 +667,29 @@ export async function runEmbeddedPiAgent(
               channel: params.messageChannel ?? params.messageProvider,
               provider,
               model: modelId,
-              isBaseline: true,
+              isBaseline,
               aborted,
               agentDir,
+              selection: attempt.learningSelection,
             });
+
+            // Active learning: update posteriors based on outcomes
+            if (params.config.learning.phase === "active" && trace) {
+              try {
+                const learningDb = openLearningDb(agentDir);
+                try {
+                  updatePosteriors({
+                    db: learningDb,
+                    trace,
+                    config: params.config.learning,
+                  });
+                } finally {
+                  learningDb.close();
+                }
+              } catch (err) {
+                log.debug(`learning: posterior update failed: ${String(err)}`);
+              }
+            }
           }
 
           return {
