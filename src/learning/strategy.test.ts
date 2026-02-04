@@ -252,8 +252,14 @@ describe("ThompsonStrategy", () => {
       // Since sampleBeta uses multiple random calls, we need to mock a sequence
       const randomValues = [
         0.5, // baseline check
-        0.1, 0.9, 0.1, 0.9, // First arm gets low score
-        0.9, 0.1, 0.9, 0.1, // Second arm gets high score
+        0.1,
+        0.9,
+        0.1,
+        0.9, // First arm gets low score
+        0.9,
+        0.1,
+        0.9,
+        0.1, // Second arm gets high score
       ];
       let callIndex = 0;
       mockRandom.mockImplementation(() => randomValues[callIndex++] ?? 0.5);
