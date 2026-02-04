@@ -46,6 +46,7 @@ import { normalizeUsage, type UsageLike } from "../usage.js";
 import { captureAndStoreTrace } from "../../learning/trace-capture.js";
 import { openLearningDb } from "../../learning/store.js";
 import { updatePosteriors } from "../../learning/update.js";
+import { captureAndStoreGreenTrace } from "../../green/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
 import { log } from "./logger.js";
@@ -690,6 +691,24 @@ export async function runEmbeddedPiAgent(
                 log.debug(`learning: posterior update failed: ${String(err)}`);
               }
             }
+          }
+
+          // Green layer: carbon trace capture (always on unless explicitly disabled)
+          if (params.config?.green?.enabled !== false) {
+            captureAndStoreGreenTrace({
+              runId: params.runId,
+              sessionId: params.sessionId,
+              sessionKey: params.sessionKey,
+              usage,
+              durationMs: Date.now() - started,
+              channel: params.messageChannel ?? params.messageProvider,
+              provider,
+              model: modelId,
+              aborted,
+              error: attempt.error?.message,
+              agentDir,
+              gridCarbon: params.config?.green?.defaultGridCarbon,
+            });
           }
 
           return {

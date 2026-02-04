@@ -5,6 +5,7 @@ import { AgentsSchema, AudioSchema, BindingsSchema, BroadcastSchema } from "./zo
 import { HexColorSchema, ModelsConfigSchema } from "./zod-schema.core.js";
 import { HookMappingSchema, HooksGmailSchema, InternalHooksSchema } from "./zod-schema.hooks.js";
 import { LearningSchema } from "./zod-schema.learning.js";
+import { GreenSchema } from "./zod-schema.green.js";
 import { ChannelsSchema } from "./zod-schema.providers.js";
 import { CommandsSchema, MessagesSchema, SessionSchema } from "./zod-schema.session.js";
 
@@ -303,6 +304,7 @@ export const OpenClawSchema = z
       .strict()
       .optional(),
     learning: LearningSchema,
+    green: GreenSchema,
     gateway: z
       .object({
         port: z.number().int().positive().optional(),
