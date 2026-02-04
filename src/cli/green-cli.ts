@@ -99,7 +99,8 @@ export function registerGreenCli(program: Command) {
   green
     .command("factors")
     .description("Show carbon factor estimates")
-    .action(async () => {
+    .option("--provider <name>", "Filter by provider name")
+    .action(async (opts: { provider?: string }) => {
       const { DEFAULT_CARBON_FACTORS, FALLBACK_CARBON_FACTOR } = await import("../green/config.js");
       const { renderTable } = await import("../terminal/table.js");
       const { theme } = await import("../terminal/theme.js");
@@ -115,7 +116,18 @@ export function registerGreenCli(program: Command) {
         { key: "conf", header: "Conf", align: "right" as const, minWidth: 6 },
       ];
 
-      const rows = DEFAULT_CARBON_FACTORS.map((f) => ({
+      const filtered = opts.provider
+        ? DEFAULT_CARBON_FACTORS.filter(
+            (f) => f.provider.toLowerCase() === opts.provider!.toLowerCase(),
+          )
+        : DEFAULT_CARBON_FACTORS;
+
+      if (filtered.length === 0) {
+        console.log(theme.muted(`No factors found for provider: ${opts.provider}`));
+        return;
+      }
+
+      const rows = filtered.map((f) => ({
         provider: f.provider,
         model: f.model,
         input: String(f.inputCo2Per1MTokens),

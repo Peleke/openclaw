@@ -34,20 +34,23 @@ curl http://localhost:18789/__openclaw__/api/green/summary
   "totalTokens": 87500000,
   "intensityPerMillionTokens": 142.29,
   "intensityPerQuery": 6.74,
-  "dateRange": {
-    "start": "2025-01-15",
-    "end": "2025-02-04"
-  },
-  "byProvider": {
-    "anthropic": { "traces": 1500, "co2Grams": 10200.3 },
-    "openai": { "traces": 347, "co2Grams": 2250.2 }
-  },
+  "minTimestamp": 1705276800000,
+  "maxTimestamp": 1738569600000,
+  "uncertaintyLower": 0.7,
+  "uncertaintyUpper": 1.3,
+  "providers": [
+    { "provider": "anthropic", "traceCount": 1500, "totalCo2Grams": 10200.3, "percentage": 81.9 },
+    { "provider": "openai", "traceCount": 347, "totalCo2Grams": 2250.2, "percentage": 18.1 }
+  ],
   "equivalents": {
     "carKm": 62.3,
     "phoneCharges": 1245,
     "treeDays": 259.4,
-    "streamingHours": 345.8,
     "googleSearches": 62252
+  },
+  "confidence": {
+    "label": "low",
+    "description": "Estimated from similar models"
   }
 }
 ```
@@ -65,7 +68,6 @@ curl http://localhost:18789/__openclaw__/api/green/config
 ```json
 {
   "enabled": true,
-  "mode": "passive",
   "defaultGridCarbon": 400,
   "factorOverrides": {},
   "dailyAlertThreshold": null,
@@ -156,23 +158,19 @@ Returns time-bucketed emissions data.
 **Parameters:**
 | Param | Type | Default | Description |
 |-------|------|---------|-------------|
-| `metric` | string | `co2` | Metric: `co2`, `water`, `traces` |
-| `bucket` | string | `1d` | Bucket size: `1h`, `1d`, `1w`, `1M` |
-| `since` | number | 30 days | Start timestamp (ms) |
+| `window` | string | `1d` | Bucket size: `1h`, `1d`, `7d` |
 
 **Request:**
 ```bash
-curl "http://localhost:18789/__openclaw__/api/green/timeseries?metric=co2&bucket=1d"
+curl "http://localhost:18789/__openclaw__/api/green/timeseries?window=1d"
 ```
 
 **Response:**
 ```json
 {
-  "metric": "co2",
-  "bucket": "1d",
-  "data": [
-    { "timestamp": 1706832000000, "value": 450.2 },
-    { "timestamp": 1706918400000, "value": 523.8 }
+  "buckets": [
+    { "t": 1706832000000, "co2Grams": 450.2, "traceCount": 23 },
+    { "t": 1706918400000, "co2Grams": 523.8, "traceCount": 28 }
   ]
 }
 ```

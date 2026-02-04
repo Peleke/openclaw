@@ -109,6 +109,39 @@ describe("periodToRange", () => {
     expect(start).toBe(0);
     expect(end).toBeGreaterThan(0);
   });
+
+  it("parses ISO week format", () => {
+    // 2025-W05 is Jan 27 - Feb 2
+    const { start, end } = periodToRange("2025-W05");
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
+    // Start should be Monday
+    expect(startDate.getUTCDay()).toBe(1); // Monday
+    // End should be Sunday (at 23:59:59.999)
+    expect(endDate.getUTCDay()).toBe(0); // Sunday
+
+    // Verify it spans ~7 days (Monday 00:00 to Sunday 23:59:59.999)
+    const diffMs = end - start;
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    // Should be close to 7 days (6 days 23 hours 59 minutes 59 seconds)
+    expect(diffDays).toBeGreaterThan(6.9);
+    expect(diffDays).toBeLessThan(7.1);
+  });
+
+  it("parses ISO week format case-insensitively", () => {
+    const upper = periodToRange("2025-W10");
+    const lower = periodToRange("2025-w10");
+    expect(upper.start).toBe(lower.start);
+    expect(upper.end).toBe(lower.end);
+  });
+
+  it("handles week 1 which may start in previous year", () => {
+    const { start } = periodToRange("2025-W01");
+    const startDate = new Date(start);
+    // Week 1 of 2025 starts Dec 30, 2024 (Monday)
+    expect(startDate.getUTCDay()).toBe(1); // Monday
+  });
 });
 
 describe("exportGhgProtocol", () => {

@@ -103,7 +103,11 @@ export function createGreenApiHandler(opts: {
     if (route === "traces") {
       const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 1000);
       const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
-      sendJson(res, 200, listCarbonTraces(db, { limit, offset }));
+      const provider = url.searchParams.get("provider") ?? undefined;
+      const model = url.searchParams.get("model") ?? undefined;
+      const sinceParam = url.searchParams.get("since");
+      const since = sinceParam ? Number(sinceParam) : undefined;
+      sendJson(res, 200, listCarbonTraces(db, { limit, offset, provider, model, since }));
       return true;
     }
 

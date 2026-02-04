@@ -254,6 +254,77 @@ describe("green store", () => {
       expect(total).toBe(0);
       expect(traces).toEqual([]);
     });
+
+    it("filters by provider", () => {
+      insertCarbonTrace(db, makeTrace({ traceId: "t1", provider: "anthropic" }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t2", provider: "anthropic" }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t3", provider: "openai" }));
+
+      const { traces, total } = listCarbonTraces(db, { provider: "anthropic" });
+      expect(total).toBe(2);
+      expect(traces).toHaveLength(2);
+      expect(traces.every((t) => t.provider === "anthropic")).toBe(true);
+    });
+
+    it("filters by model", () => {
+      insertCarbonTrace(db, makeTrace({ traceId: "t1", model: "claude-sonnet" }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t2", model: "claude-opus" }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t3", model: "claude-sonnet" }));
+
+      const { traces, total } = listCarbonTraces(db, { model: "claude-sonnet" });
+      expect(total).toBe(2);
+      expect(traces).toHaveLength(2);
+      expect(traces.every((t) => t.model === "claude-sonnet")).toBe(true);
+    });
+
+    it("filters by since timestamp", () => {
+      insertCarbonTrace(db, makeTrace({ traceId: "t1", timestamp: 1000 }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t2", timestamp: 2000 }));
+      insertCarbonTrace(db, makeTrace({ traceId: "t3", timestamp: 3000 }));
+
+      const { traces, total } = listCarbonTraces(db, { since: 2000 });
+      expect(total).toBe(2);
+      expect(traces).toHaveLength(2);
+      expect(traces.every((t) => t.timestamp >= 2000)).toBe(true);
+    });
+
+    it("combines multiple filters", () => {
+      insertCarbonTrace(
+        db,
+        makeTrace({
+          traceId: "t1",
+          provider: "anthropic",
+          model: "claude-sonnet",
+          timestamp: 3000,
+        }),
+      );
+      insertCarbonTrace(
+        db,
+        makeTrace({ traceId: "t2", provider: "anthropic", model: "claude-opus", timestamp: 2000 }),
+      );
+      insertCarbonTrace(
+        db,
+        makeTrace({ traceId: "t3", provider: "openai", model: "gpt-4", timestamp: 3000 }),
+      );
+      insertCarbonTrace(
+        db,
+        makeTrace({
+          traceId: "t4",
+          provider: "anthropic",
+          model: "claude-sonnet",
+          timestamp: 1000,
+        }),
+      );
+
+      const { traces, total } = listCarbonTraces(db, {
+        provider: "anthropic",
+        model: "claude-sonnet",
+        since: 2000,
+      });
+      expect(total).toBe(1);
+      expect(traces).toHaveLength(1);
+      expect(traces[0].traceId).toBe("t1");
+    });
   });
 
   describe("countCarbonTraces", () => {

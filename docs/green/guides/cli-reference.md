@@ -19,7 +19,6 @@ openclaw green status
 ```
 
 **Output:**
-- Mode (passive/active/disabled)
 - Grid carbon intensity
 - Total carbon emissions
 - Total water usage
@@ -154,12 +153,9 @@ openclaw green targets:remove --id <target-id>
 
 ## Global Options
 
-These options apply to all commands:
-
 | Option | Description |
 |--------|-------------|
 | `--help` | Show help for command |
-| `--json` | Output as JSON (where applicable) |
 
 ## Exit Codes
 

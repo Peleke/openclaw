@@ -35,7 +35,7 @@ export const EMISSION_FACTOR_SOURCES = [
 
 /**
  * Convert period string to timestamp range.
- * Supports formats: "2025", "2025-Q1", "2025-01"
+ * Supports formats: "2025", "2025-Q1", "2025-W05", "2025-01"
  */
 export function periodToRange(period: string): { start: number; end: number } {
   // Year only: "2025"
@@ -68,6 +68,33 @@ export function periodToRange(period: string): { start: number; end: number } {
     return {
       start: new Date(year, month, 1).getTime(),
       end: new Date(year, month + 1, 1).getTime() - 1,
+    };
+  }
+
+  // ISO week: "2025-W05"
+  const weekMatch = period.match(/^(\d{4})-W(\d{2})$/i);
+  if (weekMatch) {
+    const year = parseInt(weekMatch[1], 10);
+    const week = parseInt(weekMatch[2], 10);
+
+    // Find Monday of ISO week 1 (week containing Jan 4)
+    const jan4 = new Date(Date.UTC(year, 0, 4));
+    const dayOfWeek = jan4.getUTCDay() || 7; // Convert Sunday=0 to 7
+    const mondayWeek1 = new Date(jan4);
+    mondayWeek1.setUTCDate(jan4.getUTCDate() - dayOfWeek + 1);
+
+    // Calculate Monday of target week
+    const mondayOfWeek = new Date(mondayWeek1);
+    mondayOfWeek.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
+
+    // Sunday of target week (end of week)
+    const sundayOfWeek = new Date(mondayOfWeek);
+    sundayOfWeek.setUTCDate(mondayOfWeek.getUTCDate() + 6);
+    sundayOfWeek.setUTCHours(23, 59, 59, 999);
+
+    return {
+      start: mondayOfWeek.getTime(),
+      end: sundayOfWeek.getTime(),
     };
   }
 

@@ -140,14 +140,47 @@ export function insertCarbonTrace(db: DatabaseSync, trace: CarbonTrace): void {
 
 export function listCarbonTraces(
   db: DatabaseSync,
-  opts?: { limit?: number; offset?: number },
+  opts?: {
+    limit?: number;
+    offset?: number;
+    provider?: string;
+    model?: string;
+    since?: number;
+  },
 ): { traces: CarbonTrace[]; total: number } {
   const limit = opts?.limit ?? 100;
   const offset = opts?.offset ?? 0;
-  const total = countCarbonTraces(db);
+
+  // Build dynamic WHERE clause
+  const conditions: string[] = [];
+  const params: unknown[] = [];
+
+  if (opts?.provider) {
+    conditions.push("provider = ?");
+    params.push(opts.provider);
+  }
+  if (opts?.model) {
+    conditions.push("model = ?");
+    params.push(opts.model);
+  }
+  if (opts?.since) {
+    conditions.push("timestamp >= ?");
+    params.push(opts.since);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  // Count with filters
+  const countRow = db
+    .prepare(`SELECT COUNT(*) as cnt FROM carbon_traces ${whereClause}`)
+    .get(...params) as { cnt: number };
+  const total = countRow.cnt;
+
+  // Query with filters
   const rows = db
-    .prepare("SELECT * FROM carbon_traces ORDER BY timestamp DESC LIMIT ? OFFSET ?")
-    .all(limit, offset) as Array<Record<string, unknown>>;
+    .prepare(`SELECT * FROM carbon_traces ${whereClause} ORDER BY timestamp DESC LIMIT ? OFFSET ?`)
+    .all(...params, limit, offset) as Array<Record<string, unknown>>;
+
   return { traces: rows.map(rowToTrace), total };
 }
 

@@ -7,8 +7,7 @@ Configure the Green module via `openclaw.json`.
 ```json
 {
   "green": {
-    "enabled": true,
-    "mode": "passive"
+    "enabled": true
   }
 }
 ```
@@ -19,7 +18,6 @@ Configure the Green module via `openclaw.json`.
 {
   "green": {
     "enabled": true,
-    "mode": "passive",
     "defaultGridCarbon": 400,
     "factorOverrides": {
       "anthropic:claude-sonnet-4": {
@@ -43,20 +41,6 @@ Configure the Green module via `openclaw.json`.
 | `boolean` | `true` | Enable or disable tracking entirely |
 
 When `false`, no carbon traces are recorded.
-
-### `mode`
-
-| Type | Default | Description |
-|------|---------|-------------|
-| `string` | `"passive"` | Tracking mode |
-
-**Values:**
-
-| Mode | Description |
-|------|-------------|
-| `"disabled"` | No tracking (same as `enabled: false`) |
-| `"passive"` | Silent tracking, data available via CLI/API |
-| `"active"` | Shows emissions after each request |
 
 ### `defaultGridCarbon`
 
