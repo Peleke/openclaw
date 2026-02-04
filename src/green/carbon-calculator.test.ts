@@ -5,7 +5,7 @@ import {
   calculateEquivalents,
   formatConfidence,
 } from "./carbon-calculator.js";
-import { DEFAULT_CARBON_FACTORS, FALLBACK_CARBON_FACTOR } from "./config.js";
+import { FALLBACK_CARBON_FACTOR } from "./config.js";
 
 describe("carbon-calculator", () => {
   describe("findCarbonFactor", () => {
