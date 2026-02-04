@@ -314,4 +314,33 @@ export function registerGreenCli(program: Command) {
         db.close();
       }
     });
+
+  green
+    .command("dashboard")
+    .description("Generate and serve the green dashboard")
+    .option("--port <port>", "Gateway port", "18789")
+    .action(async (opts) => {
+      const fs = await import("node:fs");
+      const os = await import("node:os");
+      const path = await import("node:path");
+      const { generateGreenDashboardHtml } = await import("../green/dashboard-html.js");
+      const { pickPrimaryTailnetIPv4 } = await import("../infra/tailnet.js");
+
+      const port = opts.port;
+
+      // Resolve Tailscale IP for remote access; fall back to localhost
+      const tailnetIp = pickPrimaryTailnetIPv4();
+      const host = tailnetIp ? `http://${tailnetIp}:${port}` : `http://localhost:${port}`;
+
+      const apiBase = `${host}/__openclaw__/api/green`;
+      const html = generateGreenDashboardHtml({ apiBase });
+
+      const canvasDir = path.join(os.homedir(), ".openclaw", "canvas", "green");
+      fs.mkdirSync(canvasDir, { recursive: true });
+      const htmlPath = path.join(canvasDir, "index.html");
+      fs.writeFileSync(htmlPath, html, "utf-8");
+
+      console.log(`Dashboard written to ${htmlPath}`);
+      console.log(`Open: ${host}/__openclaw__/canvas/green/`);
+    });
 }

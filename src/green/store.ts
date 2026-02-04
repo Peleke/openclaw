@@ -153,7 +153,7 @@ export function listCarbonTraces(
 
   // Build dynamic WHERE clause
   const conditions: string[] = [];
-  const params: unknown[] = [];
+  const params: (string | number)[] = [];
 
   if (opts?.provider) {
     conditions.push("provider = ?");
