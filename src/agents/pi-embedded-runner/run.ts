@@ -705,7 +705,7 @@ export async function runEmbeddedPiAgent(
               provider,
               model: modelId,
               aborted,
-              error: attempt.error?.message,
+              error: attempt.promptError instanceof Error ? attempt.promptError.message : undefined,
               agentDir,
               gridCarbon: params.config?.green?.defaultGridCarbon,
             });
