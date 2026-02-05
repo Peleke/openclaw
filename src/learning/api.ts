@@ -22,7 +22,7 @@ const PREFIX = "/__openclaw__/api/learning/";
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", process.env.OPENCLAW_CORS_ORIGIN ?? "*");
   res.end(JSON.stringify(body));
 }
 
@@ -49,6 +49,25 @@ export function createLearningApiHandler(opts: {
     const url = parseUrl(req);
     if (!url || !url.pathname.startsWith(PREFIX)) return false;
 
+    const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
+
+    // Dashboard serves HTML on-the-fly — no DB needed, no filesystem writes.
+    if (route === "dashboard") {
+      if (req.method !== "GET") {
+        res.statusCode = 405;
+        res.setHeader("Allow", "GET");
+        res.end("Method Not Allowed");
+        return true;
+      }
+      const { generateLearningDashboardHtml } = await import("./dashboard-html.js");
+      const html = generateLearningDashboardHtml({ apiBase: "/__openclaw__/api/learning" });
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(html);
+      return true;
+    }
+
     const db = getDb();
     if (!db) {
       sendJson(res, 503, { error: "Learning DB not available" });
@@ -61,8 +80,6 @@ export function createLearningApiHandler(opts: {
       res.end("Method Not Allowed");
       return true;
     }
-
-    const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
 
     if (route === "summary") {
       const summary = getTraceSummary(db);

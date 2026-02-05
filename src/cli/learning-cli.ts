@@ -4,11 +4,7 @@
  */
 
 import type { Command } from "commander";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
 import { resolveOpenClawAgentDir } from "../agents/agent-paths.js";
-import { pickPrimaryTailnetIPv4 } from "../infra/tailnet.js";
 
 async function openDb() {
   const { openLearningDb } = await import("../learning/store.js");
@@ -22,7 +18,30 @@ export function registerLearningCli(program: Command) {
   learning
     .command("status")
     .description("Show learning layer summary and top/bottom arms")
-    .action(async () => {
+    .option("--host <host>", "Gateway host override")
+    .option("--port <port>", "Gateway port override")
+    .action(async (opts: { host?: string; port?: string }) => {
+      const { fetchGatewayJson } = await import("../infra/gateway-http.js");
+      const apiOpts = { host: opts.host, port: opts.port };
+
+      // Try gateway API first (live data)
+      const [summary, config, posteriors] = await Promise.all([
+        fetchGatewayJson("/__openclaw__/api/learning", "/summary", apiOpts),
+        fetchGatewayJson("/__openclaw__/api/learning", "/config", apiOpts),
+        fetchGatewayJson("/__openclaw__/api/learning", "/posteriors", apiOpts),
+      ]);
+
+      if (summary && config && posteriors) {
+        const { formatLearningStatusFromApi } = await import("../learning/cli-status.js");
+        console.log(
+          formatLearningStatusFromApi({ summary, config, posteriors } as Parameters<
+            typeof formatLearningStatusFromApi
+          >[0]),
+        );
+        return;
+      }
+
+      // Fallback: local DB
       const { formatLearningStatus } = await import("../learning/cli-status.js");
       const db = await openDb();
       try {
@@ -58,25 +77,12 @@ export function registerLearningCli(program: Command) {
 
   learning
     .command("dashboard")
-    .description("Generate and serve the learning dashboard")
-    .option("--port <port>", "Gateway port", "18789")
-    .action(async (opts) => {
-      const { generateLearningDashboardHtml } = await import("../learning/dashboard-html.js");
-      const port = opts.port;
-
-      // Resolve Tailscale IP for remote access; fall back to localhost
-      const tailnetIp = pickPrimaryTailnetIPv4();
-      const host = tailnetIp ? `http://${tailnetIp}:${port}` : `http://localhost:${port}`;
-
-      const apiBase = `${host}/__openclaw__/api/learning`;
-      const html = generateLearningDashboardHtml({ apiBase });
-
-      const canvasDir = path.join(os.homedir(), ".openclaw", "canvas", "learning");
-      fs.mkdirSync(canvasDir, { recursive: true });
-      const htmlPath = path.join(canvasDir, "index.html");
-      fs.writeFileSync(htmlPath, html, "utf-8");
-
-      console.log(`Dashboard written to ${htmlPath}`);
-      console.log(`Open: ${host}/__openclaw__/canvas/learning/`);
+    .description("Open the learning dashboard (served by gateway)")
+    .option("--host <host>", "Gateway host override")
+    .option("--port <port>", "Gateway port override")
+    .action(async (opts: { host?: string; port?: string }) => {
+      const { resolveGatewayUrl } = await import("../infra/gateway-url.js");
+      const url = resolveGatewayUrl({ host: opts.host, port: opts.port });
+      console.log(`Dashboard: ${url}/__openclaw__/api/learning/dashboard`);
     });
 }

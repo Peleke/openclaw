@@ -128,6 +128,30 @@ export async function createGatewayRuntimeState(params: {
     // Learning module not available — skip
   }
 
+  // Green API — lazily open DB on first request
+  let handleGreenApiRequest: import("./server-http.js").HooksRequestHandler | undefined;
+  try {
+    const { createGreenApiHandler } = await import("../green/api.js");
+    const { openGreenDb } = await import("../green/store.js");
+    const { resolveOpenClawAgentDir } = await import("../agents/agent-paths.js");
+    let greenDb: import("node:sqlite").DatabaseSync | null = null;
+    const agentDir = resolveOpenClawAgentDir();
+    handleGreenApiRequest = createGreenApiHandler({
+      getDb: () => {
+        if (!greenDb) {
+          try {
+            greenDb = openGreenDb(agentDir);
+          } catch {
+            return null;
+          }
+        }
+        return greenDb;
+      },
+    });
+  } catch {
+    // Green module not available — skip
+  }
+
   const bindHosts = await resolveGatewayListenHosts(params.bindHost);
   const httpServers: HttpServer[] = [];
   const httpBindHosts: string[] = [];
@@ -142,6 +166,7 @@ export async function createGatewayRuntimeState(params: {
       handleHooksRequest,
       handlePluginRequest,
       handleLearningApiRequest,
+      handleGreenApiRequest,
       resolvedAuth: params.resolvedAuth,
       tlsOptions: params.gatewayTls?.enabled ? params.gatewayTls.tlsOptions : undefined,
     });

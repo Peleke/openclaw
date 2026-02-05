@@ -29,6 +29,8 @@ import type {
 import type { DevicePairingList } from "./controllers/devices";
 import type { ExecApprovalRequest } from "./controllers/exec-approval";
 import type { NostrProfileFormState } from "./views/channels.nostr-profile-form";
+import type { LearningState } from "./controllers/learning";
+import type { GreenState } from "./controllers/green";
 
 export type AppViewState = {
   settings: UiSettings;
@@ -146,6 +148,8 @@ export type AppViewState = {
   logsLevelFilters: Record<LogLevel, boolean>;
   logsAutoFollow: boolean;
   logsTruncated: boolean;
+  learningState: LearningState;
+  greenState: GreenState;
   client: GatewayBrowserClient | null;
   connect: () => void;
   setTab: (tab: Tab) => void;
@@ -206,4 +210,6 @@ export type AppViewState = {
   handleLogsLevelFilterToggle: (level: LogLevel) => void;
   handleLogsAutoFollowToggle: (next: boolean) => void;
   handleCallDebugMethod: (method: string, params: string) => Promise<void>;
+  loadLearning: () => Promise<void>;
+  loadGreen: () => Promise<void>;
 };

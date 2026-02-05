@@ -1,0 +1,39 @@
+flowchart TB
+    subgraph UI["Gateway UI"]
+        GT["Green Tab"]
+    end
+
+    subgraph API["/__openclaw__/api/green/*"]
+        EP[REST Endpoints]
+    end
+
+    subgraph Core["Green Module"]
+        CC[Carbon Calculator]
+        CS[(Carbon Store<br/>SQLite)]
+        GC[Grid Carbon<br/>Config]
+    end
+
+    subgraph Capture["Trace Capture"]
+        TC[trace-capture.ts]
+    end
+
+    subgraph Runner["Pi Runner"]
+        PR[Agent Execution<br/>usage, model, tokens]
+    end
+
+    GT --> EP
+    EP --> CC
+    EP --> CS
+    EP --> GC
+
+    CC --> TC
+    CS --> TC
+    GC --> TC
+
+    TC --> PR
+
+    style UI fill:#e8f5e9
+    style API fill:#e3f2fd
+    style Core fill:#fff3e0
+    style Capture fill:#fce4ec
+    style Runner fill:#f3e5f5

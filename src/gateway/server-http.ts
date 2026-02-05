@@ -210,6 +210,7 @@ export function createGatewayHttpServer(opts: {
   handleHooksRequest: HooksRequestHandler;
   handlePluginRequest?: HooksRequestHandler;
   handleLearningApiRequest?: HooksRequestHandler;
+  handleGreenApiRequest?: HooksRequestHandler;
   resolvedAuth: import("./auth.js").ResolvedGatewayAuth;
   tlsOptions?: TlsOptions;
 }): HttpServer {
@@ -223,6 +224,7 @@ export function createGatewayHttpServer(opts: {
     handleHooksRequest,
     handlePluginRequest,
     handleLearningApiRequest,
+    handleGreenApiRequest,
     resolvedAuth,
   } = opts;
   const httpServer: HttpServer = opts.tlsOptions
@@ -251,6 +253,7 @@ export function createGatewayHttpServer(opts: {
       if (await handleSlackHttpRequest(req, res)) return;
       if (handlePluginRequest && (await handlePluginRequest(req, res))) return;
       if (handleLearningApiRequest && (await handleLearningApiRequest(req, res))) return;
+      if (handleGreenApiRequest && (await handleGreenApiRequest(req, res))) return;
       if (openResponsesEnabled) {
         if (
           await handleOpenResponsesHttpRequest(req, res, {
