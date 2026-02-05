@@ -41,8 +41,8 @@ Upstream OpenClaw is a great gateway. But we wanted to answer questions it doesn
 - **How much carbon does my AI usage produce?** (Green)
 - **Which tools actually help the agent?** (Learning)
 - **Can the system prompt get smaller without getting worse?** (Learning)
-- **Can the gateway react to events without being asked?** ([Cadence](https://github.com/Peleke/cadence) — ambient intelligence via signals and responders)
-- **Can we isolate agent execution beyond Docker?** ([OpenClaw Sandbox](https://github.com/Peleke/openclaw-sandbox) — process-level isolation for defense-in-depth around the built-in Docker sandbox)
+- **Can the gateway react to events without being asked?** ([Cadence](https://peleke.github.io/cadence/) — ambient intelligence via signals and responders)
+- **Can we isolate agent execution beyond Docker?** ([OpenClaw Sandbox](https://peleke.github.io/openclaw-sandbox/) — process-level isolation for defense-in-depth around the built-in Docker sandbox)
 
 Green and Learning run as **always-on, zero-config layers** inside the gateway. No opt-in, no setup. Data from the first request. Cadence and Sandbox are companion packages that plug in alongside.
 
