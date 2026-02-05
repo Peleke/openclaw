@@ -94,10 +94,19 @@ describe("fetchGatewayJson", () => {
   });
 
   it("returns null on network error (connection refused)", async () => {
-    // Port that is definitely not listening
+    // Get an ephemeral port that's provably closed
+    const closedPort = await new Promise<number>((resolve) => {
+      const tmp = http.createServer();
+      tmp.listen(0, "127.0.0.1", () => {
+        const addr = tmp.address();
+        const port = typeof addr === "object" && addr ? addr.port : 1;
+        tmp.close(() => resolve(port));
+      });
+    });
+
     const result = await fetchGatewayJson("/api/test", "/data", {
       host: "127.0.0.1",
-      port: 1, // Very unlikely to be in use
+      port: closedPort,
       timeoutMs: 500,
     });
     expect(result).toBeNull();

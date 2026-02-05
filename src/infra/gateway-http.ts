@@ -25,7 +25,8 @@ export async function fetchGatewayJson<T>(
   opts?: FetchGatewayJsonOpts,
 ): Promise<T | null> {
   const base = resolveGatewayUrl(opts);
-  const url = `${base}${apiPrefix}${route}`;
+  // Use URL constructor for safe composition instead of string concat
+  const url = new URL(`${apiPrefix}${route}`, base).href;
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   try {

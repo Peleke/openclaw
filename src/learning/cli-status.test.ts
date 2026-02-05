@@ -294,9 +294,18 @@ describe("formatLearningStatusFromApi", () => {
   });
 
   it("handles no config values gracefully", () => {
-    const output = formatLearningStatusFromApi(makeApiData({ config: { phase: "passive" } }));
+    const output = formatLearningStatusFromApi(
+      makeApiData({
+        config: {
+          phase: "passive",
+          tokenBudget: undefined,
+          baselineRate: undefined,
+          minPulls: undefined,
+        },
+      }),
+    );
     expect(output).toContain("[PASSIVE]");
-    // No config parts should be shown
+    // No config parts should be shown when values are absent
     expect(output).not.toContain("Budget:");
   });
 

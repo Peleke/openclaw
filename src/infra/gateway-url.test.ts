@@ -116,3 +116,90 @@ describe("resolveGatewayUrl", () => {
     expect(resolveGatewayUrl({ host: "::1", port: 18789 })).toBe("http://::1:18789");
   });
 });
+
+// -- Property-based tests --
+
+describe("resolveGatewayUrl properties", () => {
+  afterEach(() => {
+    delete process.env.OPENCLAW_GATEWAY_HOST;
+    delete process.env.OPENCLAW_GATEWAY_PORT;
+  });
+
+  const HOSTS = [
+    "localhost",
+    "10.0.0.1",
+    "my-gateway",
+    "100.64.1.5",
+    "192.168.1.1",
+    "gateway.local",
+  ];
+  const PORTS = [80, 443, 3000, 8080, 18789, 9999, 65535];
+
+  it("output always starts with http://", () => {
+    for (const host of HOSTS) {
+      for (const port of PORTS) {
+        expect(resolveGatewayUrl({ host, port })).toMatch(/^http:\/\//);
+      }
+    }
+  });
+
+  it("output always contains the resolved host", () => {
+    for (const host of HOSTS) {
+      const url = resolveGatewayUrl({ host, port: 18789 });
+      expect(url).toContain(host);
+    }
+  });
+
+  it("output always contains the resolved port", () => {
+    for (const port of PORTS) {
+      const url = resolveGatewayUrl({ host: "localhost", port });
+      expect(url).toContain(String(port));
+    }
+  });
+
+  it("resolveGatewayUrl composes resolveGatewayHost and resolveGatewayUrlPort", () => {
+    for (const host of HOSTS) {
+      for (const port of PORTS) {
+        const opts = { host, port };
+        const url = resolveGatewayUrl(opts);
+        const expectedHost = resolveGatewayHost(opts);
+        const expectedPort = resolveGatewayUrlPort(opts);
+        expect(url).toBe(`http://${expectedHost}:${expectedPort}`);
+      }
+    }
+  });
+
+  it("default host is always 127.0.0.1 when no opts and no env", () => {
+    delete process.env.OPENCLAW_GATEWAY_HOST;
+    // Test with various port values, host should always default
+    for (const port of PORTS) {
+      expect(resolveGatewayUrl({ port })).toMatch(/^http:\/\/127\.0\.0\.1:/);
+    }
+    expect(resolveGatewayUrl()).toMatch(/^http:\/\/127\.0\.0\.1:/);
+  });
+
+  it("opts.host always takes priority over env var", () => {
+    const envHosts = ["env1.local", "env2.local", "10.99.0.1"];
+    for (const envHost of envHosts) {
+      process.env.OPENCLAW_GATEWAY_HOST = envHost;
+      for (const optsHost of HOSTS) {
+        const url = resolveGatewayUrl({ host: optsHost });
+        expect(url).toContain(optsHost);
+        expect(url).not.toContain(envHost);
+      }
+    }
+  });
+
+  it("port is always a positive integer in the output", () => {
+    for (const host of HOSTS) {
+      for (const port of PORTS) {
+        const url = resolveGatewayUrl({ host, port });
+        const match = url.match(/:(\d+)$/);
+        expect(match).not.toBeNull();
+        const parsed = Number(match![1]);
+        expect(parsed).toBeGreaterThan(0);
+        expect(Number.isInteger(parsed)).toBe(true);
+      }
+    }
+  });
+});

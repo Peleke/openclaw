@@ -22,7 +22,7 @@ const PREFIX = "/__openclaw__/api/learning/";
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", process.env.OPENCLAW_CORS_ORIGIN ?? "*");
   res.end(JSON.stringify(body));
 }
 
