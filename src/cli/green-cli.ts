@@ -18,7 +18,30 @@ export function registerGreenCli(program: Command) {
   green
     .command("status")
     .description("Show environmental impact summary")
-    .action(async () => {
+    .option("--host <host>", "Gateway host override")
+    .option("--port <port>", "Gateway port override")
+    .action(async (opts: { host?: string; port?: string }) => {
+      const { fetchGatewayJson } = await import("../infra/gateway-http.js");
+      const apiOpts = { host: opts.host, port: opts.port };
+
+      // Try gateway API first (live data)
+      const [summary, config, targets] = await Promise.all([
+        fetchGatewayJson("/__openclaw__/api/green", "/summary", apiOpts),
+        fetchGatewayJson("/__openclaw__/api/green", "/config", apiOpts),
+        fetchGatewayJson("/__openclaw__/api/green", "/targets", apiOpts),
+      ]);
+
+      if (summary && config && targets) {
+        const { formatGreenStatusFromApi } = await import("../green/cli-status.js");
+        console.log(
+          formatGreenStatusFromApi({ summary, config, targets } as Parameters<
+            typeof formatGreenStatusFromApi
+          >[0]),
+        );
+        return;
+      }
+
+      // Fallback: local DB
       const { formatGreenStatus } = await import("../green/cli-status.js");
       const db = await openDb();
       try {
@@ -317,30 +340,12 @@ export function registerGreenCli(program: Command) {
 
   green
     .command("dashboard")
-    .description("Generate and serve the green dashboard")
-    .option("--port <port>", "Gateway port", "18789")
-    .action(async (opts) => {
-      const fs = await import("node:fs");
-      const os = await import("node:os");
-      const path = await import("node:path");
-      const { generateGreenDashboardHtml } = await import("../green/dashboard-html.js");
-      const { pickPrimaryTailnetIPv4 } = await import("../infra/tailnet.js");
-
-      const port = opts.port;
-
-      // Resolve Tailscale IP for remote access; fall back to localhost
-      const tailnetIp = pickPrimaryTailnetIPv4();
-      const host = tailnetIp ? `http://${tailnetIp}:${port}` : `http://localhost:${port}`;
-
-      const apiBase = `${host}/__openclaw__/api/green`;
-      const html = generateGreenDashboardHtml({ apiBase });
-
-      const canvasDir = path.join(os.homedir(), ".openclaw", "canvas", "green");
-      fs.mkdirSync(canvasDir, { recursive: true });
-      const htmlPath = path.join(canvasDir, "index.html");
-      fs.writeFileSync(htmlPath, html, "utf-8");
-
-      console.log(`Dashboard written to ${htmlPath}`);
-      console.log(`Open: ${host}/__openclaw__/canvas/green/`);
+    .description("Open the green dashboard (served by gateway)")
+    .option("--host <host>", "Gateway host override")
+    .option("--port <port>", "Gateway port override")
+    .action(async (opts: { host?: string; port?: string }) => {
+      const { resolveGatewayUrl } = await import("../infra/gateway-url.js");
+      const url = resolveGatewayUrl({ host: opts.host, port: opts.port });
+      console.log(`Dashboard: ${url}/__openclaw__/api/green/dashboard`);
     });
 }
