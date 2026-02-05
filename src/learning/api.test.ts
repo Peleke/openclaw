@@ -290,6 +290,89 @@ describe("learning API handler", () => {
     });
   });
 
+  describe("GET /dashboard", () => {
+    it("returns HTML dashboard", async () => {
+      const handler = createLearningApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus, getHeaders } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/learning/dashboard",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getHeaders()["Content-Type"]).toContain("text/html");
+      expect(getHeaders()["Cache-Control"]).toBe("no-store");
+      expect(getBody()).toContain("<!DOCTYPE html>");
+      expect(getBody()).toContain("Learning Dashboard");
+      expect(getBody()).toContain("chart.js");
+    });
+
+    it("serves dashboard even when DB is null", async () => {
+      const handler = createLearningApiHandler({ getDb: () => null });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/learning/dashboard",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getBody()).toContain("Learning Dashboard");
+    });
+
+    it("uses relative apiBase in generated HTML", async () => {
+      const handler = createLearningApiHandler({ getDb: () => db });
+      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/dashboard");
+      await handler(req, res);
+
+      // apiBase should be relative, not absolute with host
+      expect(getBody()).toContain('"/__openclaw__/api/learning"');
+      expect(getBody()).not.toContain("http://");
+    });
+
+    it("returns 405 for non-GET methods on dashboard", async () => {
+      const handler = createLearningApiHandler({ getDb: () => db });
+
+      for (const method of ["POST", "PUT", "DELETE"]) {
+        const { req, res, getStatus } = mockReqRes(method, "/__openclaw__/api/learning/dashboard");
+        await handler(req, res);
+        expect(getStatus()).toBe(405);
+      }
+    });
+
+    it("handles trailing slash on dashboard route", async () => {
+      const handler = createLearningApiHandler({ getDb: () => db });
+      const { req, res, getStatus, getBody } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/learning/dashboard/",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getBody()).toContain("Learning Dashboard");
+    });
+
+    it("bypasses DB null-check (serves before DB gate)", async () => {
+      const handler = createLearningApiHandler({ getDb: () => null });
+      // Non-dashboard routes should return 503 when DB is null
+      const {
+        req: reqSummary,
+        res: resSummary,
+        getStatus: getSumStatus,
+      } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
+      await handler(reqSummary, resSummary);
+      expect(getSumStatus()).toBe(503);
+
+      // Dashboard should still work
+      const {
+        req: reqDash,
+        res: resDash,
+        getStatus: getDashStatus,
+      } = mockReqRes("GET", "/__openclaw__/api/learning/dashboard");
+      await handler(reqDash, resDash);
+      expect(getDashStatus()).toBe(200);
+    });
+  });
+
   describe("/summary with baseline comparison", () => {
     it("includes baseline comparison stats", async () => {
       insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));

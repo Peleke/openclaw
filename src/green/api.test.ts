@@ -592,4 +592,66 @@ describe("green API handler", () => {
       expect(data.ghgInventory.uncertainty).toBeDefined();
     });
   });
+
+  describe("GET /dashboard", () => {
+    it("returns HTML dashboard", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody, getStatus, getHeaders } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/dashboard",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getHeaders()["Content-Type"]).toContain("text/html");
+      expect(getHeaders()["Cache-Control"]).toBe("no-store");
+      expect(getBody()).toContain("<!DOCTYPE html>");
+      expect(getBody()).toContain("Green Dashboard");
+      expect(getBody()).toContain("chart.js");
+    });
+
+    it("serves dashboard even when DB is null", async () => {
+      const handler = createGreenApiHandler({ getDb: () => null });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/dashboard",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getBody()).toContain("Green Dashboard");
+    });
+
+    it("uses relative apiBase in generated HTML", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/green/dashboard");
+      await handler(req, res);
+
+      // apiBase should be relative, not absolute with host
+      expect(getBody()).toContain('"/__openclaw__/api/green"');
+      expect(getBody()).not.toContain("http://");
+    });
+
+    it("returns 405 for non-GET methods on dashboard", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+
+      for (const method of ["POST", "PUT", "DELETE"]) {
+        const { req, res, getStatus } = mockReqRes(method, "/__openclaw__/api/green/dashboard");
+        await handler(req, res);
+        expect(getStatus()).toBe(405);
+      }
+    });
+
+    it("handles trailing slash on dashboard route", async () => {
+      const handler = createGreenApiHandler({ getDb: () => db });
+      const { req, res, getStatus, getBody } = mockReqRes(
+        "GET",
+        "/__openclaw__/api/green/dashboard/",
+      );
+      await handler(req, res);
+
+      expect(getStatus()).toBe(200);
+      expect(getBody()).toContain("Green Dashboard");
+    });
+  });
 });
