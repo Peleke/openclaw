@@ -14,6 +14,17 @@ API uses the same authentication as other OpenClaw endpoints. Include credential
 
 ## Endpoints
 
+### GET /dashboard
+
+Serves the standalone Green dashboard as HTML. This endpoint does not require the database — the HTML page fetches data from the other API endpoints at runtime via JavaScript.
+
+**Request:**
+```bash
+curl http://localhost:18789/__openclaw__/api/green/dashboard
+```
+
+**Response:** `text/html` — A self-contained HTML page with Chart.js visualizations.
+
 ### GET /summary
 
 Returns carbon footprint summary.

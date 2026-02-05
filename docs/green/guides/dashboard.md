@@ -2,39 +2,33 @@
 
 The Green module includes a standalone dashboard for visualizing your environmental impact data.
 
-## Generating the Dashboard
+## Opening the Dashboard
 
-Run the dashboard command to generate the visualization:
+Run the dashboard command to get the URL:
 
 ```bash
 openclaw green dashboard
 ```
 
-This creates `~/.openclaw/canvas/green/index.html` and prints the URL to access it.
-
 **Output:**
 ```
-Dashboard written to /Users/you/.openclaw/canvas/green/index.html
-Open: http://localhost:18789/__openclaw__/canvas/green/
+Dashboard: http://localhost:18789/__openclaw__/api/green/dashboard
 ```
 
-## Accessing the Dashboard
+Open that URL in your browser. The gateway serves the dashboard HTML on-the-fly — no files are written to disk.
 
-### Via Gateway (Recommended)
+### Custom Host and Port
 
-1. Ensure the gateway is running:
-   ```bash
-   openclaw gateway run
-   ```
+```bash
+openclaw green dashboard --host 10.0.0.5 --port 9999
+```
 
-2. Open the dashboard URL in your browser:
-   ```
-   http://localhost:18789/__openclaw__/canvas/green/
-   ```
+You can also set `OPENCLAW_GATEWAY_HOST` to avoid passing `--host` every time:
 
-### Via Local File
-
-You can also open the HTML file directly in a browser. Note that API calls will fail without the gateway running, but you can still preview the UI structure.
+```bash
+export OPENCLAW_GATEWAY_HOST=10.0.0.5
+openclaw green dashboard
+```
 
 ## Dashboard Sections
 
@@ -123,21 +117,29 @@ The dashboard uses a dark theme matching the gateway control-ui:
 
 ## Remote Access
 
-If you have Tailscale configured, the dashboard command automatically detects your Tailnet IP and generates a remote-accessible URL:
+Use `--host` to point at a remote gateway (e.g., via Tailscale or WireGuard):
 
+```bash
+openclaw green dashboard --host 100.x.x.x
 ```
-Open: http://100.x.x.x:18789/__openclaw__/canvas/green/
+
+Or set it globally:
+
+```bash
+export OPENCLAW_GATEWAY_HOST=100.x.x.x
+openclaw green dashboard
 ```
 
 ## CLI Options
 
 ```bash
-openclaw green dashboard [--port <port>]
+openclaw green dashboard [--host <host>] [--port <port>]
 ```
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `--port` | `18789` | Gateway port for API calls |
+| `--host` | `127.0.0.1` | Gateway host (or set `OPENCLAW_GATEWAY_HOST`) |
+| `--port` | `18789` | Gateway port |
 
 ## Troubleshooting
 

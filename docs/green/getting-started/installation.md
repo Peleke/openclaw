@@ -63,7 +63,11 @@ Same as passive, plus:
 
 No tracking. Useful for privacy-sensitive deployments.
 
-## Database Location
+## Data Access
+
+When the gateway is running, the CLI fetches live data from the gateway API. If the gateway is unreachable, it falls back to the local SQLite database.
+
+### Database Location
 
 Carbon traces are stored in SQLite at:
 
@@ -74,6 +78,8 @@ Carbon traces are stored in SQLite at:
 This database contains:
 - `carbon_traces` — Per-request emission records
 - `carbon_targets` — SBTi reduction targets
+
+**Note:** When running in a sandboxed or remote gateway environment, the gateway's database may be at a different path than the host's. The CLI's API-first approach ensures you always see the gateway's live data regardless of filesystem layout.
 
 ## Next Steps
 

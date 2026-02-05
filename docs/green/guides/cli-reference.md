@@ -15,8 +15,16 @@ openclaw green <command> [options]
 Display environmental impact summary.
 
 ```bash
-openclaw green status
+openclaw green status [--host <host>] [--port <port>]
 ```
+
+When the gateway is reachable, data is fetched from the gateway API (live data). If the gateway is unreachable, falls back to the local SQLite database.
+
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `127.0.0.1` | Gateway host (or set `OPENCLAW_GATEWAY_HOST`) |
+| `--port` | `18789` | Gateway port |
 
 **Output:**
 - Grid carbon intensity
@@ -150,6 +158,24 @@ openclaw green targets:remove --id <target-id>
 | Option | Description |
 |--------|-------------|
 | `--id` | Target ID to remove |
+
+### `green dashboard`
+
+Print the URL of the Green dashboard.
+
+```bash
+openclaw green dashboard [--host <host>] [--port <port>]
+```
+
+The gateway serves the dashboard HTML on-the-fly at `/__openclaw__/api/green/dashboard`. No files are written to disk.
+
+**Options:**
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `127.0.0.1` | Gateway host (or set `OPENCLAW_GATEWAY_HOST`) |
+| `--port` | `18789` | Gateway port |
+
+See the [Dashboard Guide](dashboard.md) for details on dashboard sections, themes, and troubleshooting.
 
 ## Global Options
 
