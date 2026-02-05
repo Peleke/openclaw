@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'mkdocs.yml'
       - '.github/workflows/docs.yml'
   workflow_dispatch:
 
@@ -32,12 +33,12 @@ jobs:
         run: pip install mkdocs
 
       - name: Build docs
-        run: cd docs && mkdocs build
+        run: mkdocs build
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: docs/site
+          path: site
 
   deploy:
     needs: build

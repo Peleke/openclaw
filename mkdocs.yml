@@ -1,0 +1,45 @@
+site_name: OpenClaw
+site_url: https://peleke.github.io/openclaw/
+site_description: Opinionated observability layers for AI agents
+repo_url: https://github.com/Peleke/openclaw
+repo_name: Peleke/openclaw
+docs_dir: docs
+
+theme:
+  name: readthedocs
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Green:
+    - Overview: green/index.md
+    - Getting Started:
+      - Installation: green/getting-started/installation.md
+      - Quick Start: green/getting-started/quick-start.md
+      - Core Concepts: green/getting-started/concepts.md
+    - Guides:
+      - CLI Reference: green/guides/cli-reference.md
+      - Dashboard: green/guides/dashboard.md
+      - Configuration: green/guides/configuration.md
+      - API Reference: green/guides/api-reference.md
+    - Standards:
+      - GHG Protocol: green/standards/ghg-protocol.md
+      - CDP Climate: green/standards/cdp-climate.md
+      - TCFD: green/standards/tcfd.md
+      - ISO 14064: green/standards/iso-14064.md
+      - SBTi ICT: green/standards/sbti-ict.md
+    - Methodology:
+      - Carbon Factors: green/methodology/carbon-factors.md
+      - Confidence Scoring: green/methodology/confidence-scoring.md
+      - Uncertainty Bounds: green/methodology/uncertainty-bounds.md
+      - Regional Grid: green/methodology/regional-grid.md
+    - Reference:
+      - Types: green/reference/types.md
+      - Exports: green/reference/exports.md
