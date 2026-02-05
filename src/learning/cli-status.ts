@@ -1,46 +1,76 @@
 /**
  * CLI status report for learning layer observability.
+ * Supports both local DB reads and pre-fetched API data.
  */
 
 import type { DatabaseSync } from "node:sqlite";
 import type { LearningConfig } from "./types.js";
 import { getTraceSummary, loadPosteriors, getBaselineComparison } from "./store.js";
+import type { TraceSummary, BaselineComparison } from "./store.js";
 import { renderTable, type TableColumn } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
 
-export type FormatLearningStatusOpts = {
-  db: DatabaseSync;
-  config?: LearningConfig | null;
+// -- Types for API-sourced data --
+
+export type LearningStatusApiData = {
+  summary: TraceSummary & {
+    baseline: BaselineComparison;
+  };
+  config: {
+    enabled?: boolean;
+    phase: string;
+    strategy?: string;
+    tokenBudget?: number;
+    baselineRate?: number;
+    minPulls?: number;
+    seedArmIds?: string[];
+  };
+  posteriors: Array<{
+    armId: string;
+    alpha: number;
+    beta: number;
+    pulls: number;
+    lastUpdated: number;
+    mean: number;
+  }>;
 };
 
-export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStatusOpts): string {
-  // Support both old signature (db only) and new signature (opts object)
-  const opts: FormatLearningStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
-  const { db, config } = opts;
+// -- Internal rendering data shape --
 
-  const summary = getTraceSummary(db);
-  const baseline = getBaselineComparison(db);
+type PosteriorRow = {
+  armId: string;
+  alpha: number;
+  beta: number;
+  pulls: number;
+  lastUpdated: number;
+  mean: number;
+};
+
+type LearningRenderData = {
+  phase: string;
+  configParts: string[];
+  summary: TraceSummary;
+  baseline: BaselineComparison;
+  posteriors: PosteriorRow[];
+};
+
+// -- Shared renderer --
+
+function renderLearningStatus(data: LearningRenderData): string {
+  const { summary, baseline } = data;
   const lines: string[] = [];
 
   // Summary header with mode badge
-  const phase = config?.phase ?? "passive";
-  const phaseColor = phase === "active" ? theme.success : theme.muted;
+  const phaseColor = data.phase === "active" ? theme.success : theme.muted;
   lines.push(
-    theme.heading("Learning Layer Status") + "  " + phaseColor(`[${phase.toUpperCase()}]`),
+    theme.heading("Learning Layer Status") + "  " + phaseColor(`[${data.phase.toUpperCase()}]`),
   );
   lines.push("");
 
   // Config info
-  if (config) {
-    const configParts = [];
-    if (config.tokenBudget) configParts.push(`Budget: ${config.tokenBudget.toLocaleString()}`);
-    if (config.baselineRate != null)
-      configParts.push(`Baseline: ${(config.baselineRate * 100).toFixed(0)}%`);
-    if (config.minPulls) configParts.push(`Min pulls: ${config.minPulls}`);
-    if (configParts.length > 0) {
-      lines.push(theme.muted("  " + configParts.join("  |  ")));
-      lines.push("");
-    }
+  if (data.configParts.length > 0) {
+    lines.push(theme.muted("  " + data.configParts.join("  |  ")));
+    lines.push("");
   }
 
   if (summary.traceCount === 0) {
@@ -52,8 +82,8 @@ export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStat
 
   const dateRange =
     summary.minTimestamp && summary.maxTimestamp
-      ? `${new Date(summary.minTimestamp).toLocaleDateString()} – ${new Date(summary.maxTimestamp).toLocaleDateString()}`
-      : "–";
+      ? `${new Date(summary.minTimestamp).toLocaleDateString()} \u2013 ${new Date(summary.maxTimestamp).toLocaleDateString()}`
+      : "\u2013";
 
   lines.push(
     `  Traces: ${theme.accent(String(summary.traceCount))}    Arms: ${theme.accent(String(summary.armCount))}    Tokens: ${theme.accent(summary.totalTokens.toLocaleString())}    Range: ${theme.muted(dateRange)}`,
@@ -77,7 +107,7 @@ export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStat
       lines.push(
         `  Token Savings: ${savingsColor(sign + baseline.tokenSavingsPercent.toFixed(1) + "%")}` +
           theme.muted(
-            ` (baseline avg: ${baseline.baselineAvgTokens?.toFixed(0) ?? "–"}, selected avg: ${baseline.selectedAvgTokens?.toFixed(0) ?? "–"})`,
+            ` (baseline avg: ${baseline.baselineAvgTokens?.toFixed(0) ?? "\u2013"}, selected avg: ${baseline.selectedAvgTokens?.toFixed(0) ?? "\u2013"})`,
           ),
       );
     }
@@ -85,15 +115,11 @@ export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStat
   }
 
   // Posteriors table
-  const posteriors = loadPosteriors(db);
-  if (posteriors.size === 0) {
+  const sorted = data.posteriors;
+  if (sorted.length === 0) {
     lines.push(theme.muted("No arm posteriors yet."));
     return lines.join("\n");
   }
-
-  const sorted = Array.from(posteriors.values())
-    .map((p) => ({ ...p, mean: p.alpha / (p.alpha + p.beta) }))
-    .sort((a, b) => b.mean - a.mean);
 
   const cols: TableColumn[] = [
     { key: "armId", header: "Arm", flex: true },
@@ -102,7 +128,7 @@ export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStat
     { key: "lastUpdated", header: "Last Updated", align: "right", minWidth: 12 },
   ];
 
-  const formatRow = (p: (typeof sorted)[0]) => ({
+  const formatRow = (p: PosteriorRow) => ({
     armId: p.armId,
     mean: p.mean.toFixed(3),
     pulls: String(p.pulls),
@@ -124,4 +150,63 @@ export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStat
   }
 
   return lines.join("\n");
+}
+
+// -- Public: DB-based (existing) --
+
+export type FormatLearningStatusOpts = {
+  db: DatabaseSync;
+  config?: LearningConfig | null;
+};
+
+export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStatusOpts): string {
+  // Support both old signature (db only) and new signature (opts object)
+  const opts: FormatLearningStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
+  const { db, config } = opts;
+
+  const summary = getTraceSummary(db);
+  const baseline = getBaselineComparison(db);
+  const phase = config?.phase ?? "passive";
+
+  const configParts: string[] = [];
+  if (config) {
+    if (config.tokenBudget) configParts.push(`Budget: ${config.tokenBudget.toLocaleString()}`);
+    if (config.baselineRate != null)
+      configParts.push(`Baseline: ${(config.baselineRate * 100).toFixed(0)}%`);
+    if (config.minPulls) configParts.push(`Min pulls: ${config.minPulls}`);
+  }
+
+  const posteriorMap = loadPosteriors(db);
+  const posteriors = Array.from(posteriorMap.values())
+    .map((p) => ({ ...p, mean: p.alpha / (p.alpha + p.beta) }))
+    .sort((a, b) => b.mean - a.mean);
+
+  return renderLearningStatus({
+    phase,
+    configParts,
+    summary,
+    baseline,
+    posteriors,
+  });
+}
+
+// -- Public: API-data-based (new) --
+
+export function formatLearningStatusFromApi(data: LearningStatusApiData): string {
+  const { summary, config, posteriors } = data;
+
+  const configParts: string[] = [];
+  if (config.tokenBudget) configParts.push(`Budget: ${config.tokenBudget.toLocaleString()}`);
+  if (config.baselineRate != null)
+    configParts.push(`Baseline: ${(config.baselineRate * 100).toFixed(0)}%`);
+  if (config.minPulls) configParts.push(`Min pulls: ${config.minPulls}`);
+
+  // posteriors come pre-sorted from API (by mean descending)
+  return renderLearningStatus({
+    phase: config.phase ?? "passive",
+    configParts,
+    summary,
+    baseline: summary.baseline,
+    posteriors,
+  });
 }

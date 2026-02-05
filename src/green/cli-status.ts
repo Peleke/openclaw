@@ -1,9 +1,17 @@
 /**
  * CLI status report for green layer observability.
+ * Supports both local DB reads and pre-fetched API data.
  */
 
 import type { DatabaseSync } from "node:sqlite";
-import type { GreenConfig } from "./types.js";
+import type {
+  GreenConfig,
+  CarbonSummary,
+  CarbonEquivalents,
+  ProviderBreakdown,
+  CarbonTarget,
+  TargetProgress,
+} from "./types.js";
 import {
   getCarbonSummary,
   getProviderBreakdown,
@@ -20,27 +28,53 @@ import { renderTable, type TableColumn } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
 import { resolveGreenConfig } from "./config.js";
 
-export type FormatGreenStatusOpts = {
-  db: DatabaseSync;
-  config?: GreenConfig | null;
+// -- Types for API-sourced data --
+
+export type GreenStatusApiData = {
+  summary: CarbonSummary & {
+    equivalents: CarbonEquivalents;
+    providers: ProviderBreakdown[];
+    confidence: { label: string; color: string };
+  };
+  config: {
+    enabled: boolean;
+    defaultGridCarbon: number;
+    showInStatus?: boolean;
+    dailyAlertThreshold?: number | null;
+  };
+  targets: {
+    targets: CarbonTarget[];
+    progress: TargetProgress[];
+  };
 };
 
-export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts): string {
-  const opts: FormatGreenStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
-  const { db, config } = opts;
+// -- Internal rendering data shape --
 
-  const resolved = resolveGreenConfig(config ?? undefined);
-  const summary = getCarbonSummary(db);
+type GreenRenderData = {
+  enabled: boolean;
+  defaultGridCarbon: number;
+  summary: CarbonSummary;
+  confidenceLabel: string;
+  equivalents: CarbonEquivalents;
+  providers: ProviderBreakdown[];
+  targets: CarbonTarget[];
+  targetProgress: (TargetProgress | null)[];
+};
+
+// -- Shared renderer --
+
+function renderGreenStatus(data: GreenRenderData): string {
+  const { summary, enabled } = data;
   const lines: string[] = [];
 
   // Header
-  const statusLabel = resolved.enabled ? "TRACKING" : "DISABLED";
-  const statusColor = resolved.enabled ? theme.success : theme.muted;
+  const statusLabel = enabled ? "TRACKING" : "DISABLED";
+  const statusColor = enabled ? theme.success : theme.muted;
   lines.push(theme.heading("Environmental Impact") + "  " + statusColor(`[${statusLabel}]`));
   lines.push("");
 
   // Config info
-  const configParts = [`Grid: ${resolved.defaultGridCarbon} gCO\u2082/kWh`];
+  const configParts = [`Grid: ${data.defaultGridCarbon} gCO\u2082/kWh`];
   lines.push(theme.muted("  " + configParts.join("  |  ")));
   lines.push("");
 
@@ -52,7 +86,6 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
   }
 
   // Summary stats
-  const confidence = formatConfidence(summary.avgConfidence);
   const dateRange =
     summary.minTimestamp && summary.maxTimestamp
       ? `${new Date(summary.minTimestamp).toLocaleDateString()} \u2013 ${new Date(summary.maxTimestamp).toLocaleDateString()}`
@@ -72,12 +105,12 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
     `  Carbon: ${theme.accent(co2Display)} CO\u2082eq    Water: ${theme.accent(waterDisplay)}    Traces: ${theme.accent(String(summary.traceCount))}    Since: ${theme.muted(dateRange)}`,
   );
   lines.push(
-    `  Confidence: ${theme.muted(`${(summary.avgConfidence * 100).toFixed(0)}% (${confidence.label})`)}`,
+    `  Confidence: ${theme.muted(`${(summary.avgConfidence * 100).toFixed(0)}% (${data.confidenceLabel})`)}`,
   );
   lines.push("");
 
   // Equivalents
-  const equiv = calculateEquivalents(summary.totalCo2Grams);
+  const equiv = data.equivalents;
   lines.push(
     theme.muted(
       `  \u2248 Driving ${equiv.carKm.toFixed(1)} km  |  \u2248 ${equiv.phoneCharges} phone charges  |  \u2248 ${equiv.treeDays.toFixed(1)} tree-days`,
@@ -86,8 +119,7 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
   lines.push("");
 
   // Provider breakdown
-  const providers = getProviderBreakdown(db);
-  if (providers.length > 0) {
+  if (data.providers.length > 0) {
     lines.push(theme.heading("Provider Breakdown"));
 
     const cols: TableColumn[] = [
@@ -97,7 +129,7 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
       { key: "pct", header: "%", align: "right", minWidth: 6 },
     ];
 
-    const rows = providers.map((p) => ({
+    const rows = data.providers.map((p) => ({
       provider: p.provider,
       traces: String(p.traceCount),
       co2:
@@ -127,24 +159,72 @@ export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts
   }
 
   // SBTi Targets
-  const targets = listCarbonTargets(db);
-  if (targets.length > 0) {
+  if (data.targets.length > 0) {
     lines.push("");
     lines.push(theme.heading("Emission Targets (SBTi)"));
 
-    for (const target of targets.slice(0, 3)) {
-      const progress = getTargetProgress(db, target.targetId);
+    for (let i = 0; i < Math.min(data.targets.length, 3); i++) {
+      const target = data.targets[i];
+      const progress = data.targetProgress[i];
       const statusIcon = progress?.onTrack ? "\u2713" : "\u26A0";
-      const statusColor = progress?.onTrack ? theme.success : theme.warn;
+      const sColor = progress?.onTrack ? theme.success : theme.warn;
       const progressPct = progress?.progressPercent.toFixed(0) ?? "?";
       lines.push(
-        `  ${statusColor(statusIcon)} ${target.name}: ${progressPct}% toward ${target.targetReductionPercent}% reduction by ${target.targetYear}`,
+        `  ${sColor(statusIcon)} ${target.name}: ${progressPct}% toward ${target.targetReductionPercent}% reduction by ${target.targetYear}`,
       );
     }
-    if (targets.length > 3) {
-      lines.push(theme.muted(`  ... and ${targets.length - 3} more targets`));
+    if (data.targets.length > 3) {
+      lines.push(theme.muted(`  ... and ${data.targets.length - 3} more targets`));
     }
   }
 
   return lines.join("\n");
+}
+
+// -- Public: DB-based (existing) --
+
+export type FormatGreenStatusOpts = {
+  db: DatabaseSync;
+  config?: GreenConfig | null;
+};
+
+export function formatGreenStatus(dbOrOpts: DatabaseSync | FormatGreenStatusOpts): string {
+  const opts: FormatGreenStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
+  const { db, config } = opts;
+
+  const resolved = resolveGreenConfig(config ?? undefined);
+  const summary = getCarbonSummary(db);
+  const providers = getProviderBreakdown(db);
+  const targets = listCarbonTargets(db);
+  const targetProgress = targets.map((t) => getTargetProgress(db, t.targetId));
+  const confidence = formatConfidence(summary.avgConfidence);
+  const equivalents = calculateEquivalents(summary.totalCo2Grams);
+
+  return renderGreenStatus({
+    enabled: resolved.enabled,
+    defaultGridCarbon: resolved.defaultGridCarbon,
+    summary,
+    confidenceLabel: confidence.label,
+    equivalents,
+    providers,
+    targets,
+    targetProgress,
+  });
+}
+
+// -- Public: API-data-based (new) --
+
+export function formatGreenStatusFromApi(data: GreenStatusApiData): string {
+  const { summary, config, targets: targetsData } = data;
+
+  return renderGreenStatus({
+    enabled: config.enabled,
+    defaultGridCarbon: config.defaultGridCarbon,
+    summary,
+    confidenceLabel: summary.confidence.label,
+    equivalents: summary.equivalents,
+    providers: summary.providers,
+    targets: targetsData.targets,
+    targetProgress: targetsData.progress,
+  });
 }
