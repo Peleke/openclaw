@@ -55,6 +55,25 @@ export function createGreenApiHandler(opts: {
     const url = parseUrl(req);
     if (!url || !url.pathname.startsWith(PREFIX)) return false;
 
+    const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
+
+    // Dashboard serves HTML on-the-fly — no DB needed, no filesystem writes.
+    if (route === "dashboard") {
+      if (req.method !== "GET") {
+        res.statusCode = 405;
+        res.setHeader("Allow", "GET");
+        res.end("Method Not Allowed");
+        return true;
+      }
+      const { generateGreenDashboardHtml } = await import("./dashboard-html.js");
+      const html = generateGreenDashboardHtml({ apiBase: "/__openclaw__/api/green" });
+      res.statusCode = 200;
+      res.setHeader("Content-Type", "text/html; charset=utf-8");
+      res.setHeader("Cache-Control", "no-store");
+      res.end(html);
+      return true;
+    }
+
     const db = getDb();
     if (!db) {
       sendJson(res, 503, { error: "Green DB not available" });
@@ -67,8 +86,6 @@ export function createGreenApiHandler(opts: {
       res.end("Method Not Allowed");
       return true;
     }
-
-    const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
 
     if (route === "summary") {
       const summary = getCarbonSummary(db);
