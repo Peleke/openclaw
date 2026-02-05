@@ -43,3 +43,20 @@ nav:
     - Reference:
       - Types: green/reference/types.md
       - Exports: green/reference/exports.md
+  - Learning:
+    - Overview: learning/index.md
+    - Getting Started:
+      - Installation: learning/getting-started/installation.md
+      - Quick Start: learning/getting-started/quick-start.md
+      - Core Concepts: learning/getting-started/concepts.md
+    - Guides:
+      - CLI Reference: learning/guides/cli-reference.md
+      - Dashboard: learning/guides/dashboard.md
+      - Configuration: learning/guides/configuration.md
+      - API Reference: learning/guides/api-reference.md
+    - Theory:
+      - Thompson Sampling: learning/theory/thompson-sampling.md
+      - Reward Model: learning/theory/reward-model.md
+    - Reference:
+      - Types: learning/reference/types.md
+      - Exports: learning/reference/exports.md
