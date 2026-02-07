@@ -167,6 +167,7 @@
     "@mariozechner/pi-ai": "0.50.7",
     "@mariozechner/pi-coding-agent": "0.50.7",
     "@mariozechner/pi-tui": "0.50.7",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@mozilla/readability": "^0.6.0",
     "@peleke.s/cadence": "^0.1.0",
     "@sinclair/typebox": "0.34.47",
