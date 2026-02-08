@@ -35,6 +35,7 @@ import { createCronBridge } from "../src/cadence/sources/cron-bridge.js";
 import { createInsightExtractorResponder } from "../src/cadence/responders/insight-extractor/index.js";
 import { createInsightDigestResponder } from "../src/cadence/responders/insight-digest/index.js";
 import { createTelegramNotifierResponder } from "../src/cadence/responders/telegram-notifier.js";
+import { createFileLogResponder } from "../src/cadence/responders/file-log.js";
 import { createOpenClawLLMAdapter } from "../src/cadence/llm/index.js";
 
 const COMMANDS = ["init", "config", "start", "status", "digest", "test", "help"] as const;
@@ -226,6 +227,13 @@ async function cmdStart() {
     });
   }
 
+  // 6. File log responder (for sandbox container visibility)
+  let fileLogResponder;
+  const fileLogPath = config.delivery.fileLogPath;
+  if (fileLogPath) {
+    fileLogResponder = createFileLogResponder({ filePath: fileLogPath });
+  }
+
   // Wire up logging
   bus.on("obsidian.note.modified", (signal) => {
     const filename = signal.payload.path.split("/").pop();
@@ -260,6 +268,9 @@ async function cmdStart() {
   unsubs.push(digestResponder.register(bus));
   if (deliveryResponder) {
     unsubs.push(deliveryResponder.register(bus));
+  }
+  if (fileLogResponder) {
+    unsubs.push(fileLogResponder.register(bus));
   }
 
   // Start sources

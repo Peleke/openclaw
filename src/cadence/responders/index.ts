@@ -39,3 +39,4 @@ export {
   createTelegramNotifierResponder,
   type TelegramNotifierConfig,
 } from "./telegram-notifier.js";
+export { createFileLogResponder, type FileLogResponderConfig } from "./file-log.js";

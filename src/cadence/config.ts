@@ -24,6 +24,8 @@ export interface CadenceP1Config {
     channel: "telegram" | "discord" | "log";
     telegramChatId?: string;
     discordChannelId?: string;
+    /** Optional JSONL file path for signal logging (used by sandbox containers) */
+    fileLogPath?: string;
   };
 
   /** Content pillars for categorization */
