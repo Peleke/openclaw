@@ -101,7 +101,7 @@ describe("resolveSandboxNetworkDockerConfig", () => {
   });
 });
 
-describe("resolveSandboxConfigForAgent — networkAllow", () => {
+describe("resolveSandboxConfigForAgent - networkAllow", () => {
   it("returns undefined networkAllow/networkDocker when not configured", () => {
     const cfg = resolveSandboxConfigForAgent(undefined, undefined);
     expect(cfg.networkAllow).toBeUndefined();

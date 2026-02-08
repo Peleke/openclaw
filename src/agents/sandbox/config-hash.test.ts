@@ -19,7 +19,7 @@ const baseInput = {
   agentWorkspaceDir: "/home/agent",
 };
 
-describe("computeSandboxConfigHash — networkAllow/networkDocker", () => {
+describe("computeSandboxConfigHash - networkAllow/networkDocker", () => {
   it("hash is stable without network fields", () => {
     const a = computeSandboxConfigHash(baseInput);
     const b = computeSandboxConfigHash(baseInput);
