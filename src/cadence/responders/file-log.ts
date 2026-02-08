@@ -1,5 +1,5 @@
 /**
- * File log responder — appends all signals to a JSONL file.
+ * File log responder: appends all signals to a JSONL file.
  *
  * This bridges Cadence signals to sandbox Docker containers by writing
  * to a shared JSONL file that containers can tail/read.
