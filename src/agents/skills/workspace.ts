@@ -31,6 +31,13 @@ const fsp = fs.promises;
 const skillsLogger = createSubsystemLogger("skills");
 const skillCommandDebugOnce = new Set<string>();
 
+/**
+ * Well-known directory for extra skills synced from external sources
+ * (e.g. the sandbox's sync-skills.sh puts files here).
+ * Auto-discovered when it exists — no config needed.
+ */
+export const SKILLS_EXTRA_DIR = path.join(CONFIG_DIR, "skills-extra");
+
 function debugSkillCommandOnce(
   messageKey: string,
   message: string,
@@ -125,7 +132,9 @@ function loadSkillEntries(
     workspaceDir,
     config: opts?.config,
   });
-  const mergedExtraDirs = [...extraDirs, ...pluginSkillDirs];
+  // Auto-discover well-known skills-extra dir (populated by sync-skills.sh in sandbox)
+  const wellKnownExtra = fs.existsSync(SKILLS_EXTRA_DIR) ? [SKILLS_EXTRA_DIR] : [];
+  const mergedExtraDirs = [...wellKnownExtra, ...extraDirs, ...pluginSkillDirs];
 
   const bundledSkills = bundledSkillsDir
     ? loadSkills({
