@@ -26,6 +26,11 @@ openclaw sandbox explain --agent work
 openclaw sandbox explain --json
 ```
 
+When dual-container routing is configured, `sandbox explain` also shows
+`networkAllow` (tool patterns), `networkExecAllow` (command prefix patterns),
+and `networkDocker` (network container overrides). Use this to verify which
+tools and commands are routed to the network container.
+
 ### `openclaw sandbox list`
 
 List all sandbox containers with their status and configuration.

@@ -2219,6 +2219,13 @@ For package installs, ensure network egress, a writable root FS, and a root user
           extraHosts: ["internal.service:10.0.0.5"],
           binds: ["/var/run/docker.sock:/var/run/docker.sock", "/home/user/source:/source:rw"]
         },
+        // Dual-container network routing (optional)
+        networkAllow: ["web_search", "web_fetch"],   // tools -> network container
+        networkExecAllow: ["gh"],                     // exec commands -> network container
+        networkDocker: {                              // network container overrides
+          network: "bridge",
+          dns: ["8.8.8.8"]
+        },
         browser: {
           enabled: false,
           image: "openclaw-sandbox-browser:bookworm-slim",
@@ -2260,6 +2267,23 @@ scripts/sandbox-setup.sh
 
 Note: sandbox containers default to `network: "none"`; set `agents.defaults.sandbox.docker.network`
 to `"bridge"` (or your custom network) if the agent needs outbound access.
+
+#### Network routing (dual-container)
+
+Instead of giving the whole container network access, route specific tools or commands
+to a separate network-enabled container:
+
+- `networkAllow` (string[]): tool name patterns routed to the network container.
+  Supports exact names, `*` wildcards, and `group:*` shorthands.
+- `networkExecAllow` (string[]): command prefix patterns for the exec tool. The first
+  token of each command is matched against these patterns. Only matching commands run
+  in the network container; all others stay air-gapped.
+- `networkDocker` (object): Docker config overrides for the network container. Inherits
+  from `docker` with `network` defaulting to `"bridge"`. Security hardening
+  (`readOnlyRoot`, `capDrop`) is enforced.
+
+All three fields support per-agent overrides via `agents.list[].sandbox.*`.
+See [Sandboxing - Network routing](/gateway/sandboxing#network-routing-dual-container).
 
 Note: inbound attachments are staged into the active workspace at `media/inbound/*`. With `workspaceAccess: "rw"`, that means files are written into the agent workspace.
 

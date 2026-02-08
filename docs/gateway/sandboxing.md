@@ -115,8 +115,73 @@ Sandboxed browser image:
 scripts/sandbox-browser-setup.sh
 ```
 
-By default, sandbox containers run with **no network**.
-Override with `agents.defaults.sandbox.docker.network`.
+By default, sandbox containers run with **no network** (`docker.network: "none"`).
+
+### Network routing (dual-container)
+
+Instead of giving the entire sandbox network access, you can run **two containers**: an
+air-gapped container (default, `network: "none"`) and a network-enabled container
+(`network: "bridge"`). Tools and commands are routed to the appropriate container based
+on allowlist patterns.
+
+**Tool-level routing** (`networkAllow`): routes entire tools (by name or group) to the
+network container. Tools like `web_search` and `web_fetch` run in the gateway process
+and never touch containers, but other tools can be routed this way.
+
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        networkAllow: ["web_search", "web_fetch"],  // tool name patterns
+        // or use groups: networkAllow: ["group:web"]
+      }
+    }
+  }
+}
+```
+
+**Command-level routing** (`networkExecAllow`): routes specific `exec` commands to the
+network container based on the command's first token. This lets you give `gh` or `curl`
+network access while keeping `ls`, `cat`, and everything else air-gapped.
+
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        networkExecAllow: ["gh", "curl"],  // command prefix patterns
+      }
+    }
+  }
+}
+```
+
+Routing is deny-by-default: commands and tools not matching any pattern stay in the
+isolated container. Only the first token of the command is checked (pipes, semicolons,
+and subshells do not leak through).
+
+**Network container overrides** (`networkDocker`): customize the network container's
+Docker settings. Defaults to the base `docker` config with `network: "bridge"`.
+Security hardening (`readOnlyRoot: true`, `capDrop: ["ALL"]`) is enforced regardless
+of overrides.
+
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        networkDocker: {
+          network: "bridge",
+          dns: ["8.8.8.8", "1.1.1.1"]
+        }
+      }
+    }
+  }
+}
+```
+
+All three fields support per-agent overrides via `agents.list[].sandbox.*`.
 
 Docker installs and the containerized gateway live here:
 [Docker](/install/docker)

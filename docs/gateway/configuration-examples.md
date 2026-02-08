@@ -421,6 +421,37 @@ Save to `~/.openclaw/openclaw.json` and you can DM the bot from that number.
 }
 ```
 
+## Dual-container network routing
+
+Route specific tools and exec commands to a network-enabled container while
+keeping everything else air-gapped. See [Sandboxing - Network routing](/gateway/sandboxing#network-routing-dual-container) for details.
+
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        mode: "all",
+        docker: {
+          network: "none"                              // default: air-gapped
+        },
+        networkAllow: ["web_search", "web_fetch"],     // tools -> network container
+        networkExecAllow: ["gh"],                      // exec commands -> network container
+        networkDocker: {
+          network: "bridge",                           // network container uses bridge
+          dns: ["8.8.8.8"]
+        }
+      }
+    }
+  }
+}
+```
+
+With this config:
+- `gh pr list` (via exec) runs in the network container (bridge)
+- `ls /tmp` (via exec) runs in the isolated container (no network)
+- All non-exec tools follow `networkAllow` patterns
+
 ## Common patterns
 
 ### Multi-platform setup
