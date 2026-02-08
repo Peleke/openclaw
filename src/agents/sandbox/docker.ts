@@ -160,6 +160,9 @@ export function buildSandboxCreateArgs(params: {
     const formatted = formatUlimitValue(name, value);
     if (formatted) args.push("--ulimit", formatted);
   }
+  for (const [key, value] of Object.entries(params.cfg.env ?? {})) {
+    if (key) args.push("--env", `${key}=${value}`);
+  }
   if (params.cfg.binds?.length) {
     for (const bind of params.cfg.binds) {
       args.push("-v", bind);
