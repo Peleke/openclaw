@@ -111,6 +111,7 @@ export class QortexMemoryProvider implements MemoryProvider {
   private transport: StdioClientTransport | null = null;
   private lastQueryId: string | null = null;
   private connected = false;
+  private signalCleanup: (() => void) | null = null;
 
   constructor(
     private config: QortexProviderConfig,
@@ -140,11 +141,16 @@ export class QortexMemoryProvider implements MemoryProvider {
     await this.client.connect(this.transport, { timeout: INIT_TIMEOUT_MS });
     this.connected = true;
 
-    // Register cleanup on parent exit
+    // Register cleanup on parent exit (store refs so close() can remove them)
     const cleanup = () => void this.close().catch(() => {});
     process.once("exit", cleanup);
     process.once("SIGTERM", cleanup);
     process.once("SIGINT", cleanup);
+    this.signalCleanup = () => {
+      process.removeListener("exit", cleanup);
+      process.removeListener("SIGTERM", cleanup);
+      process.removeListener("SIGINT", cleanup);
+    };
   }
 
   async search(
@@ -246,6 +252,8 @@ export class QortexMemoryProvider implements MemoryProvider {
   async close(): Promise<void> {
     if (!this.connected) return;
     this.connected = false;
+    this.signalCleanup?.();
+    this.signalCleanup = null;
     try {
       await this.client?.close();
     } catch {
