@@ -180,6 +180,8 @@ export class MemoryIndexManager {
     const { cfg, agentId } = params;
     const settings = resolveMemorySearchConfig(cfg, agentId);
     if (!settings) return null;
+    // qortex provider has its own path — MemoryIndexManager is SQLite-only
+    if (settings.provider === "qortex") return null;
     const workspaceDir = resolveAgentWorkspaceDir(cfg, agentId);
     const key = `${agentId}:${workspaceDir}:${JSON.stringify(settings)}`;
     const existing = INDEX_CACHE.get(key);

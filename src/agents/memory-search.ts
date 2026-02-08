@@ -10,7 +10,13 @@ export type ResolvedMemorySearchConfig = {
   enabled: boolean;
   sources: Array<"memory" | "sessions">;
   extraPaths: string[];
-  provider: "openai" | "local" | "gemini" | "auto";
+  provider: "openai" | "local" | "gemini" | "qortex" | "auto";
+  qortex?: {
+    command: string;
+    domains: string[];
+    topK: number;
+    feedback: boolean;
+  };
   remote?: {
     baseUrl?: string;
     apiKey?: string;
@@ -118,6 +124,16 @@ function mergeConfig(
   const sessionMemory =
     overrides?.experimental?.sessionMemory ?? defaults?.experimental?.sessionMemory ?? false;
   const provider = overrides?.provider ?? defaults?.provider ?? "auto";
+  const rawQortex = overrides?.qortex ?? defaults?.qortex;
+  const qortex =
+    provider === "qortex"
+      ? {
+          command: rawQortex?.command ?? "uvx qortex mcp-serve",
+          domains: rawQortex?.domains ?? [`memory/${agentId}`],
+          topK: rawQortex?.topK ?? 10,
+          feedback: rawQortex?.feedback ?? true,
+        }
+      : undefined;
   const defaultRemote = defaults?.remote;
   const overrideRemote = overrides?.remote;
   const hasRemoteConfig = Boolean(
@@ -243,6 +259,7 @@ function mergeConfig(
     sources,
     extraPaths,
     provider,
+    qortex,
     remote,
     experimental: {
       sessionMemory,

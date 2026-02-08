@@ -233,8 +233,19 @@ export type MemorySearchConfig = {
     /** Enable session transcript indexing (experimental, default: false). */
     sessionMemory?: boolean;
   };
-  /** Embedding provider mode. */
-  provider?: "openai" | "gemini" | "local";
+  /** Embedding provider mode ("qortex" uses qortex MCP for graph-enhanced search). */
+  provider?: "openai" | "gemini" | "local" | "qortex";
+  /** qortex-specific configuration (used when provider="qortex"). */
+  qortex?: {
+    /** MCP server command (default: "uvx qortex mcp-serve"). */
+    command?: string;
+    /** Override auto-mapped qortex domains. */
+    domains?: string[];
+    /** Max results per query (default: 10). */
+    topK?: number;
+    /** Enable memory_feedback tool for retrieval improvement (default: true). */
+    feedback?: boolean;
+  };
   remote?: {
     baseUrl?: string;
     apiKey?: string;

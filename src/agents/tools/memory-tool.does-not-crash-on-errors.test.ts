@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../../memory/index.js", () => {
+vi.mock("../../memory/search-manager.js", () => {
   return {
-    getMemorySearchManager: async () => {
+    getMemoryProvider: async () => {
       return {
-        manager: {
+        provider: {
           search: async () => {
             throw new Error("openai embeddings failed: 429 insufficient_quota");
           },
@@ -12,14 +12,9 @@ vi.mock("../../memory/index.js", () => {
             throw new Error("path required");
           },
           status: () => ({
-            files: 0,
-            chunks: 0,
-            dirty: true,
-            workspaceDir: "/tmp",
-            dbPath: "/tmp/index.sqlite",
+            available: true,
             provider: "openai",
             model: "text-embedding-3-small",
-            requestedProvider: "openai",
           }),
         },
       };
