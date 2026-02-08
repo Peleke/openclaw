@@ -41,6 +41,13 @@ function matchesAny(name: string, patterns: CompiledPattern[]): boolean {
   return false;
 }
 
+export function isToolNetworkAllowed(toolName: string, networkAllow?: string[]): boolean {
+  if (!networkAllow || networkAllow.length === 0) return false;
+  const normalized = toolName.trim().toLowerCase();
+  const patterns = compilePatterns(networkAllow);
+  return matchesAny(normalized, patterns);
+}
+
 export function isToolAllowed(policy: SandboxToolPolicy, name: string) {
   const normalized = name.trim().toLowerCase();
   const deny = compilePatterns(policy.deny);

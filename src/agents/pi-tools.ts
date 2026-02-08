@@ -40,6 +40,7 @@ import {
 import { cleanToolSchemaForGemini, normalizeToolParameters } from "./pi-tools.schema.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 import type { SandboxContext } from "./sandbox.js";
+import { isToolNetworkAllowed } from "./sandbox/tool-policy.js";
 import {
   buildPluginToolGroups,
   collectExplicitAllowlist,
@@ -250,6 +251,14 @@ export function createOpenClawCodingTools(options?: {
     return [tool as AnyAgentTool];
   });
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
+  // Resolve which container the exec tool should target.
+  const execContainerName =
+    sandbox?.networkContainerName &&
+    sandbox.networkAllowPatterns &&
+    isToolNetworkAllowed("exec", sandbox.networkAllowPatterns)
+      ? sandbox.networkContainerName
+      : sandbox?.containerName;
+
   const execTool = createExecTool({
     ...execDefaults,
     host: options?.exec?.host ?? execConfig.host,
@@ -271,7 +280,7 @@ export function createOpenClawCodingTools(options?: {
     notifyOnExit: options?.exec?.notifyOnExit ?? execConfig.notifyOnExit,
     sandbox: sandbox
       ? {
-          containerName: sandbox.containerName,
+          containerName: execContainerName!,
           workspaceDir: sandbox.workspaceDir,
           containerWorkdir: sandbox.containerWorkdir,
           env: sandbox.docker.env,

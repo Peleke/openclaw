@@ -232,22 +232,22 @@ function formatSandboxRecreateHint(params: { scope: SandboxConfig["scope"]; sess
   return formatCliCommand("openclaw sandbox recreate --all");
 }
 
-export async function ensureSandboxContainer(params: {
+export type EnsureSandboxContainerResult = {
+  containerName: string;
+  networkContainerName?: string;
+};
+
+async function ensureSingleContainer(params: {
+  containerName: string;
   sessionKey: string;
   workspaceDir: string;
   agentWorkspaceDir: string;
   cfg: SandboxConfig;
+  dockerConfig: SandboxDockerConfig;
+  expectedHash: string;
+  scopeKey: string;
 }) {
-  const scopeKey = resolveSandboxScopeKey(params.cfg.scope, params.sessionKey);
-  const slug = params.cfg.scope === "shared" ? "shared" : slugifySessionKey(scopeKey);
-  const name = `${params.cfg.docker.containerPrefix}${slug}`;
-  const containerName = name.slice(0, 63);
-  const expectedHash = computeSandboxConfigHash({
-    docker: params.cfg.docker,
-    workspaceAccess: params.cfg.workspaceAccess,
-    workspaceDir: params.workspaceDir,
-    agentWorkspaceDir: params.agentWorkspaceDir,
-  });
+  const { containerName, scopeKey, dockerConfig, expectedHash } = params;
   const now = Date.now();
   const state = await dockerContainerState(containerName);
   let hasContainer = state.exists;
@@ -288,7 +288,7 @@ export async function ensureSandboxContainer(params: {
   if (!hasContainer) {
     await createSandboxContainer({
       name: containerName,
-      cfg: params.cfg.docker,
+      cfg: dockerConfig,
       workspaceDir: params.workspaceDir,
       workspaceAccess: params.cfg.workspaceAccess,
       agentWorkspaceDir: params.agentWorkspaceDir,
@@ -303,8 +303,57 @@ export async function ensureSandboxContainer(params: {
     sessionKey: scopeKey,
     createdAtMs: now,
     lastUsedAtMs: now,
-    image: params.cfg.docker.image,
+    image: dockerConfig.image,
     configHash: hashMismatch && running ? (currentHash ?? undefined) : expectedHash,
   });
-  return containerName;
+}
+
+export async function ensureSandboxContainer(params: {
+  sessionKey: string;
+  workspaceDir: string;
+  agentWorkspaceDir: string;
+  cfg: SandboxConfig;
+}): Promise<EnsureSandboxContainerResult> {
+  const scopeKey = resolveSandboxScopeKey(params.cfg.scope, params.sessionKey);
+  const slug = params.cfg.scope === "shared" ? "shared" : slugifySessionKey(scopeKey);
+  const name = `${params.cfg.docker.containerPrefix}${slug}`;
+  const containerName = name.slice(0, 63);
+  const expectedHash = computeSandboxConfigHash({
+    docker: params.cfg.docker,
+    workspaceAccess: params.cfg.workspaceAccess,
+    workspaceDir: params.workspaceDir,
+    agentWorkspaceDir: params.agentWorkspaceDir,
+    networkDocker: params.cfg.networkDocker,
+    networkAllow: params.cfg.networkAllow,
+  });
+
+  await ensureSingleContainer({
+    containerName,
+    sessionKey: params.sessionKey,
+    workspaceDir: params.workspaceDir,
+    agentWorkspaceDir: params.agentWorkspaceDir,
+    cfg: params.cfg,
+    dockerConfig: params.cfg.docker,
+    expectedHash,
+    scopeKey,
+  });
+
+  // Create network container if dual-container routing is configured.
+  let networkContainerName: string | undefined;
+  if (params.cfg.networkAllow && params.cfg.networkDocker) {
+    const netName = `${params.cfg.docker.containerPrefix}${slug}-net`;
+    networkContainerName = netName.slice(0, 63);
+    await ensureSingleContainer({
+      containerName: networkContainerName,
+      sessionKey: params.sessionKey,
+      workspaceDir: params.workspaceDir,
+      agentWorkspaceDir: params.agentWorkspaceDir,
+      cfg: params.cfg,
+      dockerConfig: params.cfg.networkDocker,
+      expectedHash,
+      scopeKey,
+    });
+  }
+
+  return { containerName, networkContainerName };
 }

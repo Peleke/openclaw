@@ -63,7 +63,7 @@ export async function resolveSandboxContext(params: {
     await fs.mkdir(workspaceDir, { recursive: true });
   }
 
-  const containerName = await ensureSandboxContainer({
+  const { containerName, networkContainerName } = await ensureSandboxContainer({
     sessionKey: rawSessionKey,
     workspaceDir,
     agentWorkspaceDir,
@@ -87,6 +87,8 @@ export async function resolveSandboxContext(params: {
     agentWorkspaceDir,
     workspaceAccess: cfg.workspaceAccess,
     containerName,
+    networkContainerName,
+    networkAllowPatterns: cfg.networkAllow,
     containerWorkdir: cfg.docker.workdir,
     docker: cfg.docker,
     tools: cfg.tools,

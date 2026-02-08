@@ -58,6 +58,10 @@ export type AgentConfig = {
     browser?: SandboxBrowserSettings;
     /** Auto-prune overrides for this agent. */
     prune?: SandboxPruneSettings;
+    /** Per-agent tool name patterns routed to the network container. */
+    networkAllow?: string[];
+    /** Per-agent Docker overrides for the network container. */
+    networkDocker?: SandboxDockerSettings;
   };
   tools?: AgentToolsConfig;
 };

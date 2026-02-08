@@ -1,5 +1,6 @@
 import type { OpenClawConfig } from "../../config/config.js";
 import { resolveAgentConfig } from "../agent-scope.js";
+import { expandToolGroups } from "../tool-policy.js";
 import {
   DEFAULT_SANDBOX_BROWSER_AUTOSTART_TIMEOUT_MS,
   DEFAULT_SANDBOX_BROWSER_CDP_PORT,
@@ -121,6 +122,28 @@ export function resolveSandboxPruneConfig(params: {
   };
 }
 
+export function resolveSandboxNetworkDockerConfig(params: {
+  scope: SandboxScope;
+  baseDocker: SandboxDockerConfig;
+  globalNetworkDocker?: Partial<SandboxDockerConfig>;
+  agentNetworkDocker?: Partial<SandboxDockerConfig>;
+}): SandboxDockerConfig {
+  const agentOverride = params.scope === "shared" ? undefined : params.agentNetworkDocker;
+  const globalOverride = params.globalNetworkDocker;
+  // Start from base docker config, overlay network-specific overrides, default network to bridge.
+  return {
+    ...params.baseDocker,
+    ...globalOverride,
+    ...agentOverride,
+    network: agentOverride?.network ?? globalOverride?.network ?? "bridge",
+    env: {
+      ...params.baseDocker.env,
+      ...globalOverride?.env,
+      ...agentOverride?.env,
+    },
+  };
+}
+
 export function resolveSandboxConfigForAgent(
   cfg?: OpenClawConfig,
   agentId?: string,
@@ -141,17 +164,35 @@ export function resolveSandboxConfigForAgent(
 
   const toolPolicy = resolveSandboxToolPolicyForAgent(cfg, agentId);
 
+  const docker = resolveSandboxDockerConfig({
+    scope,
+    globalDocker: agent?.docker,
+    agentDocker: agentSandbox?.docker,
+  });
+
+  // Resolve networkAllow: agent overrides global; expand tool groups.
+  const rawNetworkAllow = agentSandbox?.networkAllow ?? agent?.networkAllow;
+  const networkAllow =
+    Array.isArray(rawNetworkAllow) && rawNetworkAllow.length > 0
+      ? expandToolGroups(rawNetworkAllow)
+      : undefined;
+
+  const networkDocker = networkAllow
+    ? resolveSandboxNetworkDockerConfig({
+        scope,
+        baseDocker: docker,
+        globalNetworkDocker: agent?.networkDocker,
+        agentNetworkDocker: agentSandbox?.networkDocker,
+      })
+    : undefined;
+
   return {
     mode: agentSandbox?.mode ?? agent?.mode ?? "off",
     scope,
     workspaceAccess: agentSandbox?.workspaceAccess ?? agent?.workspaceAccess ?? "none",
     workspaceRoot:
       agentSandbox?.workspaceRoot ?? agent?.workspaceRoot ?? DEFAULT_SANDBOX_WORKSPACE_ROOT,
-    docker: resolveSandboxDockerConfig({
-      scope,
-      globalDocker: agent?.docker,
-      agentDocker: agentSandbox?.docker,
-    }),
+    docker,
     browser: resolveSandboxBrowserConfig({
       scope,
       globalBrowser: agent?.browser,
@@ -166,5 +207,7 @@ export function resolveSandboxConfigForAgent(
       globalPrune: agent?.prune,
       agentPrune: agentSandbox?.prune,
     }),
+    networkAllow,
+    networkDocker,
   };
 }

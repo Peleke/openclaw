@@ -234,6 +234,10 @@ export type AgentDefaultsConfig = {
     browser?: SandboxBrowserSettings;
     /** Auto-prune sandbox containers. */
     prune?: SandboxPruneSettings;
+    /** Tool name patterns (exact, glob, group:*) routed to the network container. */
+    networkAllow?: string[];
+    /** Docker overrides for the network-enabled container. Defaults to bridge. */
+    networkDocker?: SandboxDockerSettings;
   };
 };
 

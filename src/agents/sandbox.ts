@@ -2,6 +2,7 @@ export {
   resolveSandboxBrowserConfig,
   resolveSandboxConfigForAgent,
   resolveSandboxDockerConfig,
+  resolveSandboxNetworkDockerConfig,
   resolveSandboxPruneConfig,
   resolveSandboxScope,
 } from "./sandbox/config.js";
@@ -26,7 +27,7 @@ export {
   resolveSandboxRuntimeStatus,
 } from "./sandbox/runtime-status.js";
 
-export { resolveSandboxToolPolicyForAgent } from "./sandbox/tool-policy.js";
+export { isToolNetworkAllowed, resolveSandboxToolPolicyForAgent } from "./sandbox/tool-policy.js";
 
 export type {
   SandboxBrowserConfig,

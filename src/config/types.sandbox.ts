@@ -44,6 +44,9 @@ export type SandboxDockerSettings = {
   binds?: string[];
 };
 
+/** Docker overrides for the network-enabled container. Only used with networkAllow. */
+export type SandboxNetworkDockerSettings = SandboxDockerSettings;
+
 export type SandboxBrowserSettings = {
   enabled?: boolean;
   image?: string;
