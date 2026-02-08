@@ -246,6 +246,8 @@ async function ensureSingleContainer(params: {
   dockerConfig: SandboxDockerConfig;
   expectedHash: string;
   scopeKey: string;
+  /** Override workspace access for this container (e.g. force "ro" for network containers). */
+  workspaceAccessOverride?: SandboxWorkspaceAccess;
 }) {
   const { containerName, scopeKey, dockerConfig, expectedHash } = params;
   const now = Date.now();
@@ -290,7 +292,7 @@ async function ensureSingleContainer(params: {
       name: containerName,
       cfg: dockerConfig,
       workspaceDir: params.workspaceDir,
-      workspaceAccess: params.cfg.workspaceAccess,
+      workspaceAccess: params.workspaceAccessOverride ?? params.cfg.workspaceAccess,
       agentWorkspaceDir: params.agentWorkspaceDir,
       scopeKey,
       configHash: expectedHash,
@@ -339,10 +341,15 @@ export async function ensureSandboxContainer(params: {
   });
 
   // Create network container if dual-container routing is configured.
+  // Network container always gets read-only workspace access regardless of config.
   let networkContainerName: string | undefined;
   if (params.cfg.networkAllow && params.cfg.networkDocker) {
-    const netName = `${params.cfg.docker.containerPrefix}${slug}-net`;
-    networkContainerName = netName.slice(0, 63);
+    // Reserve 4 chars for "-net" suffix before truncating to 63.
+    const baseSlug = `${params.cfg.docker.containerPrefix}${slug}`.slice(0, 59);
+    networkContainerName = `${baseSlug}-net`;
+    defaultRuntime.log(
+      `Creating network container ${networkContainerName} (network: ${params.cfg.networkDocker.network}, tools: ${params.cfg.networkAllow.join(", ")})`,
+    );
     await ensureSingleContainer({
       containerName: networkContainerName,
       sessionKey: params.sessionKey,
@@ -352,6 +359,7 @@ export async function ensureSandboxContainer(params: {
       dockerConfig: params.cfg.networkDocker,
       expectedHash,
       scopeKey,
+      workspaceAccessOverride: "ro",
     });
   }
 

@@ -249,16 +249,18 @@ describe("QortexMemoryProvider.readFile path traversal", () => {
 
 describe("SqliteMemoryProvider", () => {
   const makeMockManager = () => ({
-    search: vi.fn().mockResolvedValue([
-      {
-        path: "memory/test.md",
-        startLine: 1,
-        endLine: 5,
-        score: 0.9,
-        snippet: "hello",
-        source: "memory",
-      },
-    ]),
+    search: vi
+      .fn()
+      .mockResolvedValue([
+        {
+          path: "memory/test.md",
+          startLine: 1,
+          endLine: 5,
+          score: 0.9,
+          snippet: "hello",
+          source: "memory",
+        },
+      ]),
     readFile: vi.fn().mockResolvedValue({ text: "content", path: "/tmp/test.md" }),
     sync: vi.fn().mockResolvedValue(undefined),
     status: vi.fn().mockReturnValue({

@@ -72,6 +72,33 @@ describe("resolveSandboxNetworkDockerConfig", () => {
     });
     expect(result.env).toEqual({ LANG: "C.UTF-8", FOO: "base", BAR: "global", BAZ: "agent" });
   });
+
+  it("enforces readOnlyRoot even when overrides set false", () => {
+    const result = resolveSandboxNetworkDockerConfig({
+      scope: "agent",
+      baseDocker,
+      agentNetworkDocker: { readOnlyRoot: false },
+    });
+    expect(result.readOnlyRoot).toBe(true);
+  });
+
+  it("enforces capDrop ALL even when overrides change it", () => {
+    const result = resolveSandboxNetworkDockerConfig({
+      scope: "agent",
+      baseDocker,
+      agentNetworkDocker: { capDrop: ["NET_RAW"] },
+    });
+    expect(result.capDrop).toEqual(["ALL"]);
+  });
+
+  it("agent env overrides colliding base env keys", () => {
+    const result = resolveSandboxNetworkDockerConfig({
+      scope: "agent",
+      baseDocker: { ...baseDocker, env: { LANG: "C.UTF-8", HTTP_PROXY: "base" } },
+      agentNetworkDocker: { env: { HTTP_PROXY: "agent-override" } },
+    });
+    expect(result.env).toEqual({ LANG: "C.UTF-8", HTTP_PROXY: "agent-override" });
+  });
 });
 
 describe("resolveSandboxConfigForAgent — networkAllow", () => {

@@ -131,11 +131,15 @@ export function resolveSandboxNetworkDockerConfig(params: {
   const agentOverride = params.scope === "shared" ? undefined : params.agentNetworkDocker;
   const globalOverride = params.globalNetworkDocker;
   // Start from base docker config, overlay network-specific overrides, default network to bridge.
+  // Enforce minimum security: read-only root and cap-drop ALL are non-negotiable for
+  // network-facing containers regardless of user overrides.
   return {
     ...params.baseDocker,
     ...globalOverride,
     ...agentOverride,
     network: agentOverride?.network ?? globalOverride?.network ?? "bridge",
+    readOnlyRoot: true,
+    capDrop: ["ALL"],
     env: {
       ...params.baseDocker.env,
       ...globalOverride?.env,

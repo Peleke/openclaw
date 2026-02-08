@@ -252,6 +252,9 @@ export function createOpenClawCodingTools(options?: {
   });
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
   // Resolve which container the exec tool should target.
+  // Only exec runs inside a sandbox container; other tools (web_fetch, web_search, etc.)
+  // run in the gateway process and are not container-dispatched. networkAllow patterns
+  // control which exec invocations get routed to the network-enabled container.
   const execContainerName =
     sandbox?.networkContainerName &&
     sandbox.networkAllowPatterns &&

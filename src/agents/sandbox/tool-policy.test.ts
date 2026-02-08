@@ -58,4 +58,21 @@ describe("isToolNetworkAllowed", () => {
     expect(isToolNetworkAllowed("exec", ["web_*", "exec"])).toBe(true);
     expect(isToolNetworkAllowed("read", ["web_*", "exec"])).toBe(false);
   });
+
+  it("returns false for empty string tool name", () => {
+    expect(isToolNetworkAllowed("", ["exec"])).toBe(false);
+  });
+
+  it("returns false for whitespace-only tool name", () => {
+    expect(isToolNetworkAllowed("   ", ["exec"])).toBe(false);
+  });
+
+  it("handles tool names with regex special characters", () => {
+    expect(isToolNetworkAllowed("web.fetch", ["web_*"])).toBe(false);
+    expect(isToolNetworkAllowed("web(fetch)", ["web_*"])).toBe(false);
+  });
+
+  it("trims whitespace in tool name before matching", () => {
+    expect(isToolNetworkAllowed("  exec  ", ["exec"])).toBe(true);
+  });
 });
