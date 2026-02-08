@@ -181,7 +181,7 @@ export function resolveSandboxConfigForAgent(
       ? expandToolGroups(rawNetworkAllow)
       : undefined;
 
-  // Resolve networkExecAllow: agent overrides global (plain string patterns, no group expansion).
+  // Resolve networkExecAllow: agent overrides global. Stored as raw patterns; matched at exec time.
   const rawNetworkExecAllow = agentSandbox?.networkExecAllow ?? agent?.networkExecAllow;
   const networkExecAllow =
     Array.isArray(rawNetworkExecAllow) && rawNetworkExecAllow.length > 0
