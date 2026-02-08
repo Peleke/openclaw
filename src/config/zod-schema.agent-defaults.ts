@@ -164,6 +164,9 @@ export const AgentDefaultsSchema = z
         docker: SandboxDockerSchema,
         browser: SandboxBrowserSchema,
         prune: SandboxPruneSchema,
+        networkAllow: z.array(z.string()).optional(),
+        networkExecAllow: z.array(z.string()).optional(),
+        networkDocker: SandboxDockerSchema,
       })
       .strict()
       .optional(),

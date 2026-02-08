@@ -82,6 +82,36 @@ openclaw config set agents.list[0].tools.exec.node "node-id-or-name"
 
 Control UI: the Nodes tab includes a small “Exec node binding” panel for the same settings.
 
+## Network routing (`networkExecAllow`)
+
+When sandboxing is enabled with dual-container routing, exec commands can be routed
+to the network-enabled container based on the command's first token.
+
+Configure `agents.defaults.sandbox.networkExecAllow` (or per-agent
+`agents.list[].sandbox.networkExecAllow`) with command name patterns:
+
+```json5
+{
+  agents: {
+    defaults: {
+      sandbox: {
+        networkExecAllow: ["gh", "curl"]
+      }
+    }
+  }
+}
+```
+
+How routing works:
+- The first whitespace-delimited token of the command is extracted (e.g., `gh` from `gh pr list`)
+- If it matches a pattern, the command runs in the network container (bridge)
+- If it does not match, the command runs in the isolated container (no network)
+- Pipes and semicolons do not affect routing: `ls | gh pr list` routes to the isolated container (first token is `ls`)
+- Patterns support exact match and `*` wildcards, case-insensitive
+- Without `networkExecAllow`, all exec commands stay in the isolated container (backward compatible)
+
+See [Sandboxing - Network routing](/gateway/sandboxing#network-routing-dual-container) for the full dual-container setup.
+
 ## Session overrides (`/exec`)
 
 Use `/exec` to set **per-session** defaults for `host`, `security`, `ask`, and `node`.

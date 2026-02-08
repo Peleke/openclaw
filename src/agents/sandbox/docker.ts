@@ -160,6 +160,9 @@ export function buildSandboxCreateArgs(params: {
     const formatted = formatUlimitValue(name, value);
     if (formatted) args.push("--ulimit", formatted);
   }
+  for (const [key, value] of Object.entries(params.cfg.env ?? {})) {
+    if (key) args.push("--env", `${key}=${value}`);
+  }
   if (params.cfg.binds?.length) {
     for (const bind of params.cfg.binds) {
       args.push("-v", bind);
@@ -232,22 +235,24 @@ function formatSandboxRecreateHint(params: { scope: SandboxConfig["scope"]; sess
   return formatCliCommand("openclaw sandbox recreate --all");
 }
 
-export async function ensureSandboxContainer(params: {
+export type EnsureSandboxContainerResult = {
+  containerName: string;
+  networkContainerName?: string;
+};
+
+async function ensureSingleContainer(params: {
+  containerName: string;
   sessionKey: string;
   workspaceDir: string;
   agentWorkspaceDir: string;
   cfg: SandboxConfig;
+  dockerConfig: SandboxDockerConfig;
+  expectedHash: string;
+  scopeKey: string;
+  /** Override workspace access for this container (e.g. force "ro" for network containers). */
+  workspaceAccessOverride?: SandboxWorkspaceAccess;
 }) {
-  const scopeKey = resolveSandboxScopeKey(params.cfg.scope, params.sessionKey);
-  const slug = params.cfg.scope === "shared" ? "shared" : slugifySessionKey(scopeKey);
-  const name = `${params.cfg.docker.containerPrefix}${slug}`;
-  const containerName = name.slice(0, 63);
-  const expectedHash = computeSandboxConfigHash({
-    docker: params.cfg.docker,
-    workspaceAccess: params.cfg.workspaceAccess,
-    workspaceDir: params.workspaceDir,
-    agentWorkspaceDir: params.agentWorkspaceDir,
-  });
+  const { containerName, scopeKey, dockerConfig, expectedHash } = params;
   const now = Date.now();
   const state = await dockerContainerState(containerName);
   let hasContainer = state.exists;
@@ -288,9 +293,9 @@ export async function ensureSandboxContainer(params: {
   if (!hasContainer) {
     await createSandboxContainer({
       name: containerName,
-      cfg: params.cfg.docker,
+      cfg: dockerConfig,
       workspaceDir: params.workspaceDir,
-      workspaceAccess: params.cfg.workspaceAccess,
+      workspaceAccess: params.workspaceAccessOverride ?? params.cfg.workspaceAccess,
       agentWorkspaceDir: params.agentWorkspaceDir,
       scopeKey,
       configHash: expectedHash,
@@ -303,8 +308,63 @@ export async function ensureSandboxContainer(params: {
     sessionKey: scopeKey,
     createdAtMs: now,
     lastUsedAtMs: now,
-    image: params.cfg.docker.image,
+    image: dockerConfig.image,
     configHash: hashMismatch && running ? (currentHash ?? undefined) : expectedHash,
   });
-  return containerName;
+}
+
+export async function ensureSandboxContainer(params: {
+  sessionKey: string;
+  workspaceDir: string;
+  agentWorkspaceDir: string;
+  cfg: SandboxConfig;
+}): Promise<EnsureSandboxContainerResult> {
+  const scopeKey = resolveSandboxScopeKey(params.cfg.scope, params.sessionKey);
+  const slug = params.cfg.scope === "shared" ? "shared" : slugifySessionKey(scopeKey);
+  const name = `${params.cfg.docker.containerPrefix}${slug}`;
+  const containerName = name.slice(0, 63);
+  const expectedHash = computeSandboxConfigHash({
+    docker: params.cfg.docker,
+    workspaceAccess: params.cfg.workspaceAccess,
+    workspaceDir: params.workspaceDir,
+    agentWorkspaceDir: params.agentWorkspaceDir,
+    networkDocker: params.cfg.networkDocker,
+    networkAllow: params.cfg.networkAllow,
+  });
+
+  await ensureSingleContainer({
+    containerName,
+    sessionKey: params.sessionKey,
+    workspaceDir: params.workspaceDir,
+    agentWorkspaceDir: params.agentWorkspaceDir,
+    cfg: params.cfg,
+    dockerConfig: params.cfg.docker,
+    expectedHash,
+    scopeKey,
+  });
+
+  // Create network container if dual-container routing is configured.
+  // Network container always gets read-only workspace access regardless of config.
+  let networkContainerName: string | undefined;
+  if (params.cfg.networkAllow && params.cfg.networkDocker) {
+    // Reserve 4 chars for "-net" suffix before truncating to 63.
+    const baseSlug = `${params.cfg.docker.containerPrefix}${slug}`.slice(0, 59);
+    networkContainerName = `${baseSlug}-net`;
+    defaultRuntime.log(
+      `Creating network container ${networkContainerName} (network: ${params.cfg.networkDocker.network}, tools: ${params.cfg.networkAllow.join(", ")})`,
+    );
+    await ensureSingleContainer({
+      containerName: networkContainerName,
+      sessionKey: params.sessionKey,
+      workspaceDir: params.workspaceDir,
+      agentWorkspaceDir: params.agentWorkspaceDir,
+      cfg: params.cfg,
+      dockerConfig: params.cfg.networkDocker,
+      expectedHash,
+      scopeKey,
+      workspaceAccessOverride: "ro",
+    });
+  }
+
+  return { containerName, networkContainerName };
 }

@@ -90,6 +90,38 @@ describe("buildSandboxCreateArgs", () => {
     expect(ulimitValues).toEqual(
       expect.arrayContaining(["nofile=1024:2048", "nproc=128", "core=0"]),
     );
+
+    expect(args).toContain("--env");
+    expect(args).toContain("LANG=C.UTF-8");
+  });
+
+  it("emits --env flags for each env entry", () => {
+    const cfg: SandboxDockerConfig = {
+      image: "openclaw-sandbox:bookworm-slim",
+      containerPrefix: "openclaw-sbx-",
+      workdir: "/workspace",
+      readOnlyRoot: false,
+      tmpfs: [],
+      network: "none",
+      capDrop: [],
+      env: { GH_TOKEN: "ghp_abc123", BRAVE_API_KEY: "bsk_xyz" },
+    };
+
+    const args = buildSandboxCreateArgs({
+      name: "openclaw-sbx-env",
+      cfg,
+      scopeKey: "main",
+    });
+
+    const envFlags: string[] = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === "--env") {
+        const value = args[i + 1];
+        if (value) envFlags.push(value);
+      }
+    }
+    expect(envFlags).toContain("GH_TOKEN=ghp_abc123");
+    expect(envFlags).toContain("BRAVE_API_KEY=bsk_xyz");
   });
 
   it("emits -v flags for custom binds", () => {

@@ -7,6 +7,8 @@ type SandboxHashInput = {
   workspaceAccess: SandboxWorkspaceAccess;
   workspaceDir: string;
   agentWorkspaceDir: string;
+  networkDocker?: SandboxDockerConfig;
+  networkAllow?: string[];
 };
 
 function isPrimitive(value: unknown): value is string | number | boolean | bigint | symbol | null {

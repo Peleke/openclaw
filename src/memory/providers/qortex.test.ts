@@ -62,13 +62,17 @@ describe("QortexMemoryProvider command validation", () => {
     await expect(provider.init()).rejects.not.toThrow("allowlist");
   });
 
-  it("does not reject allowed commands (fails on spawn, not validation)", async () => {
+  it("does not reject allowed commands with allowlist error", async () => {
     for (const cmd of ["uvx qortex mcp-serve", "python3 -m qortex", "qortex serve"]) {
       const cfg = resolveQortexConfig({ command: cmd }, "a");
       const provider = new QortexMemoryProvider(cfg, "a", { agents: { list: [] } } as any);
       const err = await provider.init().catch((e: Error) => e);
-      expect(err).toBeInstanceOf(Error);
-      expect((err as Error).message).not.toContain("allowlist");
+      // If init rejects, it should be a spawn/connect error, not an allowlist error.
+      // If init resolves (command exists on this machine), that's also fine.
+      if (err instanceof Error) {
+        expect(err.message).not.toContain("allowlist");
+      }
+      await provider.close().catch(() => {});
     }
   });
 });

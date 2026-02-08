@@ -255,3 +255,7 @@ Notes:
 - Responses are cached (default 15 minutes) to reduce repeated fetches.
 - If you use tool profiles/allowlists, add `web_search`/`web_fetch` or `group:web`.
 - If the Brave key is missing, `web_search` returns a short setup hint with a docs link.
+- `web_search` and `web_fetch` run in the **gateway process** (not inside sandbox
+  containers), so they always have network access regardless of sandbox `docker.network`
+  settings. The `networkAllow` config field can route them to a network container for
+  specific deployments, but the default (gateway-process execution) is the common case.

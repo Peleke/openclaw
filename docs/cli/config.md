@@ -46,4 +46,12 @@ openclaw config set gateway.port 19001 --json
 openclaw config set channels.whatsapp.groups '["*"]' --json
 ```
 
+### Network routing examples
+
+```bash
+openclaw config set agents.defaults.sandbox.networkAllow '["web_search", "web_fetch"]' --json
+openclaw config set agents.defaults.sandbox.networkExecAllow '["gh"]' --json
+openclaw config set agents.defaults.sandbox.networkDocker '{"network": "bridge", "dns": ["8.8.8.8"]}' --json
+```
+
 Restart the gateway after edits.

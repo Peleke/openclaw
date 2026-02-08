@@ -57,6 +57,12 @@ export type SandboxConfig = {
   browser: SandboxBrowserConfig;
   tools: SandboxToolPolicy;
   prune: SandboxPruneConfig;
+  /** Compiled tool patterns for network container routing. Undefined = single-container. */
+  networkAllow?: string[];
+  /** Command prefix patterns for exec tool network routing. */
+  networkExecAllow?: string[];
+  /** Docker config for the network container. Only present when networkAllow is active. */
+  networkDocker?: SandboxDockerConfig;
 };
 
 export type SandboxBrowserContext = {
@@ -72,6 +78,12 @@ export type SandboxContext = {
   agentWorkspaceDir: string;
   workspaceAccess: SandboxWorkspaceAccess;
   containerName: string;
+  /** Name of the network-enabled container. Undefined = single-container mode. */
+  networkContainerName?: string;
+  /** Tool patterns for network routing. Undefined = single-container mode. */
+  networkAllowPatterns?: string[];
+  /** Command prefix patterns for exec network routing. */
+  networkExecAllow?: string[];
   containerWorkdir: string;
   docker: SandboxDockerConfig;
   tools: SandboxToolPolicy;

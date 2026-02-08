@@ -563,7 +563,21 @@ Also consider agent workspace access inside the sandbox:
 - `agents.defaults.sandbox.workspaceAccess: "ro"` mounts the agent workspace read-only at `/agent` (disables `write`/`edit`/`apply_patch`)
 - `agents.defaults.sandbox.workspaceAccess: "rw"` mounts the agent workspace read/write at `/workspace`
 
-Important: `tools.elevated` is the global baseline escape hatch that runs exec on the host. Keep `tools.elevated.allowFrom` tight and don’t enable it for strangers. You can further restrict elevated per agent via `agents.list[].tools.elevated`. See [Elevated Mode](/tools/elevated).
+### Network isolation (dual-container)
+
+For defense-in-depth, use dual-container routing to keep most tools and commands
+air-gapped while granting network access only to what needs it:
+
+- `networkAllow`: route specific tools to a network-enabled container
+- `networkExecAllow`: route specific exec commands (e.g., `gh`) to the network container
+  while all other exec commands stay in the isolated container (`network: "none"`)
+- The network container still enforces `readOnlyRoot: true` and `capDrop: ["ALL"]`
+
+This means a prompt injection that triggers `exec` gets no network access unless the
+command happens to match your explicit allowlist. See
+[Sandboxing - Network routing](/gateway/sandboxing#network-routing-dual-container) for configuration.
+
+Important: `tools.elevated` is the global baseline escape hatch that runs exec on the host. Keep `tools.elevated.allowFrom` tight and don't enable it for strangers. You can further restrict elevated per agent via `agents.list[].tools.elevated`. See [Elevated Mode](/tools/elevated).
 
 ## Browser control risks
 

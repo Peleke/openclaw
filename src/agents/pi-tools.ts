@@ -272,6 +272,8 @@ export function createOpenClawCodingTools(options?: {
     sandbox: sandbox
       ? {
           containerName: sandbox.containerName,
+          networkContainerName: sandbox.networkContainerName,
+          networkExecAllow: sandbox.networkExecAllow,
           workspaceDir: sandbox.workspaceDir,
           containerWorkdir: sandbox.containerWorkdir,
           env: sandbox.docker.env,

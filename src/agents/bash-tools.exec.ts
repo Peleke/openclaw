@@ -39,6 +39,7 @@ import {
   tail,
 } from "./bash-process-registry.js";
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
+import { isExecCommandNetworkAllowed } from "./sandbox/tool-policy.js";
 import {
   buildDockerExecArgs,
   buildSandboxEnv,
@@ -363,11 +364,19 @@ async function runExecProcess(opts: {
   let stdin: SessionStdin | undefined;
 
   if (opts.sandbox) {
+    // Route to network container when the command's first token matches networkExecAllow patterns.
+    const targetContainer =
+      opts.sandbox.networkContainerName &&
+      opts.sandbox.networkExecAllow &&
+      isExecCommandNetworkAllowed(opts.command, opts.sandbox.networkExecAllow)
+        ? opts.sandbox.networkContainerName
+        : opts.sandbox.containerName;
+
     const { child: spawned } = await spawnWithFallback({
       argv: [
         "docker",
         ...buildDockerExecArgs({
-          containerName: opts.sandbox.containerName,
+          containerName: targetContainer,
           command: opts.command,
           workdir: opts.containerWorkdir ?? opts.sandbox.containerWorkdir,
           env: opts.env,

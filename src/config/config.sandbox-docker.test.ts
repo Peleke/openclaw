@@ -38,6 +38,109 @@ describe("sandbox docker config", () => {
     }
   });
 
+  it("accepts networkAllow + networkDocker in sandbox config", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkAllow: ["group:web", "exec"],
+            networkDocker: { network: "bridge", dns: ["1.1.1.1"] },
+          },
+        },
+        list: [
+          {
+            id: "main",
+            sandbox: {
+              networkAllow: ["web_fetch"],
+              networkDocker: { network: "custom-net" },
+            },
+          },
+        ],
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.config.agents?.defaults?.sandbox?.networkAllow).toEqual(["group:web", "exec"]);
+      expect(res.config.agents?.defaults?.sandbox?.networkDocker?.network).toBe("bridge");
+      expect(res.config.agents?.list?.[0]?.sandbox?.networkAllow).toEqual(["web_fetch"]);
+      expect(res.config.agents?.list?.[0]?.sandbox?.networkDocker?.network).toBe("custom-net");
+    }
+  });
+
+  it("accepts config without networkAllow (backward compat)", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            docker: { network: "none" },
+          },
+        },
+      },
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("rejects non-array networkAllow", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkAllow: "exec",
+          },
+        },
+      },
+    });
+    expect(res.ok).toBe(false);
+  });
+
+  it("accepts networkExecAllow in sandbox config", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkExecAllow: ["gh", "curl"],
+          },
+        },
+        list: [
+          {
+            id: "main",
+            sandbox: {
+              networkExecAllow: ["gh"],
+            },
+          },
+        ],
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.config.agents?.defaults?.sandbox?.networkExecAllow).toEqual(["gh", "curl"]);
+      expect(res.config.agents?.list?.[0]?.sandbox?.networkExecAllow).toEqual(["gh"]);
+    }
+  });
+
+  it("rejects non-array networkExecAllow", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkExecAllow: "gh",
+          },
+        },
+      },
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("rejects non-string values in binds array", async () => {
     vi.resetModules();
     const { validateConfigObject } = await import("./config.js");
