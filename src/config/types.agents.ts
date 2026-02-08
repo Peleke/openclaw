@@ -60,6 +60,8 @@ export type AgentConfig = {
     prune?: SandboxPruneSettings;
     /** Per-agent tool name patterns routed to the network container. */
     networkAllow?: string[];
+    /** Per-agent command prefix patterns routed to the network container for exec. */
+    networkExecAllow?: string[];
     /** Per-agent Docker overrides for the network container. */
     networkDocker?: SandboxDockerSettings;
   };

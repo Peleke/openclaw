@@ -40,7 +40,6 @@ import {
 import { cleanToolSchemaForGemini, normalizeToolParameters } from "./pi-tools.schema.js";
 import type { AnyAgentTool } from "./pi-tools.types.js";
 import type { SandboxContext } from "./sandbox.js";
-import { isToolNetworkAllowed } from "./sandbox/tool-policy.js";
 import {
   buildPluginToolGroups,
   collectExplicitAllowlist,
@@ -251,17 +250,6 @@ export function createOpenClawCodingTools(options?: {
     return [tool as AnyAgentTool];
   });
   const { cleanupMs: cleanupMsOverride, ...execDefaults } = options?.exec ?? {};
-  // Resolve which container the exec tool should target.
-  // Only exec runs inside a sandbox container; other tools (web_fetch, web_search, etc.)
-  // run in the gateway process and are not container-dispatched. networkAllow patterns
-  // control which exec invocations get routed to the network-enabled container.
-  const execContainerName =
-    sandbox?.networkContainerName &&
-    sandbox.networkAllowPatterns &&
-    isToolNetworkAllowed("exec", sandbox.networkAllowPatterns)
-      ? sandbox.networkContainerName
-      : sandbox?.containerName;
-
   const execTool = createExecTool({
     ...execDefaults,
     host: options?.exec?.host ?? execConfig.host,
@@ -283,7 +271,9 @@ export function createOpenClawCodingTools(options?: {
     notifyOnExit: options?.exec?.notifyOnExit ?? execConfig.notifyOnExit,
     sandbox: sandbox
       ? {
-          containerName: execContainerName!,
+          containerName: sandbox.containerName,
+          networkContainerName: sandbox.networkContainerName,
+          networkExecAllow: sandbox.networkExecAllow,
           workspaceDir: sandbox.workspaceDir,
           containerWorkdir: sandbox.containerWorkdir,
           env: sandbox.docker.env,

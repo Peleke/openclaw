@@ -89,6 +89,7 @@ export async function resolveSandboxContext(params: {
     containerName,
     networkContainerName,
     networkAllowPatterns: cfg.networkAllow,
+    networkExecAllow: cfg.networkExecAllow,
     containerWorkdir: cfg.docker.workdir,
     docker: cfg.docker,
     tools: cfg.tools,

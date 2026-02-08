@@ -149,3 +149,48 @@ describe("resolveSandboxConfigForAgent - networkAllow", () => {
     expect(cfg.networkAllow).not.toContain("web_search");
   });
 });
+
+describe("resolveSandboxConfigForAgent - networkExecAllow", () => {
+  it("returns undefined networkExecAllow when not configured", () => {
+    const cfg = resolveSandboxConfigForAgent(undefined, undefined);
+    expect(cfg.networkExecAllow).toBeUndefined();
+  });
+
+  it("returns undefined for empty networkExecAllow array", () => {
+    const cfg = resolveSandboxConfigForAgent(
+      { agents: { defaults: { sandbox: { networkExecAllow: [] } } } },
+      undefined,
+    );
+    expect(cfg.networkExecAllow).toBeUndefined();
+  });
+
+  it("resolves networkExecAllow from global defaults", () => {
+    const cfg = resolveSandboxConfigForAgent(
+      { agents: { defaults: { sandbox: { networkExecAllow: ["gh"] } } } },
+      undefined,
+    );
+    expect(cfg.networkExecAllow).toEqual(["gh"]);
+  });
+
+  it("agent-level networkExecAllow overrides global", () => {
+    const cfg = resolveSandboxConfigForAgent(
+      {
+        agents: {
+          defaults: { sandbox: { networkExecAllow: ["gh"] } },
+          list: [{ id: "test", sandbox: { networkExecAllow: ["curl", "gh"] } }],
+        },
+      },
+      "test",
+    );
+    expect(cfg.networkExecAllow).toEqual(["curl", "gh"]);
+  });
+
+  it("creates networkDocker when only networkExecAllow is set", () => {
+    const cfg = resolveSandboxConfigForAgent(
+      { agents: { defaults: { sandbox: { networkExecAllow: ["gh"] } } } },
+      undefined,
+    );
+    expect(cfg.networkDocker).toBeDefined();
+    expect(cfg.networkDocker!.network).toBe("bridge");
+  });
+});

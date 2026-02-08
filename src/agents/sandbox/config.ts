@@ -181,7 +181,15 @@ export function resolveSandboxConfigForAgent(
       ? expandToolGroups(rawNetworkAllow)
       : undefined;
 
-  const networkDocker = networkAllow
+  // Resolve networkExecAllow: agent overrides global (plain string patterns, no group expansion).
+  const rawNetworkExecAllow = agentSandbox?.networkExecAllow ?? agent?.networkExecAllow;
+  const networkExecAllow =
+    Array.isArray(rawNetworkExecAllow) && rawNetworkExecAllow.length > 0
+      ? rawNetworkExecAllow
+      : undefined;
+
+  const needsNetworkContainer = !!networkAllow || !!networkExecAllow;
+  const networkDocker = needsNetworkContainer
     ? resolveSandboxNetworkDockerConfig({
         scope,
         baseDocker: docker,
@@ -212,6 +220,7 @@ export function resolveSandboxConfigForAgent(
       agentPrune: agentSandbox?.prune,
     }),
     networkAllow,
+    networkExecAllow,
     networkDocker,
   };
 }

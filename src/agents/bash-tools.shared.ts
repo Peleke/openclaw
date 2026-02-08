@@ -12,6 +12,10 @@ const CHUNK_LIMIT = 8 * 1024;
 
 export type BashSandboxConfig = {
   containerName: string;
+  /** Network-enabled container for command-level routing. */
+  networkContainerName?: string;
+  /** Command prefix patterns routed to the network container. */
+  networkExecAllow?: string[];
   workspaceDir: string;
   containerWorkdir: string;
   env?: Record<string, string>;

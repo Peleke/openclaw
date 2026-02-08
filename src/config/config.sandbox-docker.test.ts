@@ -99,6 +99,48 @@ describe("sandbox docker config", () => {
     expect(res.ok).toBe(false);
   });
 
+  it("accepts networkExecAllow in sandbox config", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkExecAllow: ["gh", "curl"],
+          },
+        },
+        list: [
+          {
+            id: "main",
+            sandbox: {
+              networkExecAllow: ["gh"],
+            },
+          },
+        ],
+      },
+    });
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.config.agents?.defaults?.sandbox?.networkExecAllow).toEqual(["gh", "curl"]);
+      expect(res.config.agents?.list?.[0]?.sandbox?.networkExecAllow).toEqual(["gh"]);
+    }
+  });
+
+  it("rejects non-array networkExecAllow", async () => {
+    vi.resetModules();
+    const { validateConfigObject } = await import("./config.js");
+    const res = validateConfigObject({
+      agents: {
+        defaults: {
+          sandbox: {
+            networkExecAllow: "gh",
+          },
+        },
+      },
+    });
+    expect(res.ok).toBe(false);
+  });
+
   it("rejects non-string values in binds array", async () => {
     vi.resetModules();
     const { validateConfigObject } = await import("./config.js");

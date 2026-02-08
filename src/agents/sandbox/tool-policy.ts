@@ -41,6 +41,15 @@ function matchesAny(name: string, patterns: CompiledPattern[]): boolean {
   return false;
 }
 
+export function isExecCommandNetworkAllowed(command: string, patterns?: string[]): boolean {
+  if (!patterns || patterns.length === 0) return false;
+  const firstToken = command.trim().split(/\s+/)[0];
+  if (!firstToken) return false;
+  const normalized = firstToken.toLowerCase();
+  const compiled = compilePatterns(patterns);
+  return matchesAny(normalized, compiled);
+}
+
 export function isToolNetworkAllowed(toolName: string, networkAllow?: string[]): boolean {
   if (!networkAllow || networkAllow.length === 0) return false;
   const normalized = toolName.trim().toLowerCase();

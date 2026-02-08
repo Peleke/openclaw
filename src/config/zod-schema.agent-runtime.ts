@@ -241,6 +241,7 @@ export const AgentSandboxSchema = z
     browser: SandboxBrowserSchema,
     prune: SandboxPruneSchema,
     networkAllow: z.array(z.string()).optional(),
+    networkExecAllow: z.array(z.string()).optional(),
     networkDocker: SandboxDockerSchema,
   })
   .strict()

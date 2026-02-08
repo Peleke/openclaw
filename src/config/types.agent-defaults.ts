@@ -236,6 +236,8 @@ export type AgentDefaultsConfig = {
     prune?: SandboxPruneSettings;
     /** Tool name patterns (exact, glob, group:*) routed to the network container. */
     networkAllow?: string[];
+    /** Command prefix patterns routed to the network container for exec tool invocations. */
+    networkExecAllow?: string[];
     /** Docker overrides for the network-enabled container. Defaults to bridge. */
     networkDocker?: SandboxDockerSettings;
   };
