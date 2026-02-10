@@ -7,6 +7,9 @@ import { resolveSessionAgentId } from "../agent-scope.js";
 import { resolveMemorySearchConfig } from "../memory-search.js";
 import type { AnyAgentTool } from "./common.js";
 import { jsonResult, readNumberParam, readStringParam } from "./common.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
+
+const log = createSubsystemLogger("memory-tools");
 
 const MemorySearchSchema = Type.Object({
   query: Type.String(),
@@ -31,12 +34,21 @@ export function createMemorySearchTool(options: {
   agentSessionKey?: string;
 }): AnyAgentTool | null {
   const cfg = options.config;
-  if (!cfg) return null;
+  if (!cfg) {
+    log.warn("memory_search not registered: no config passed to plugin");
+    return null;
+  }
   const agentId = resolveSessionAgentId({
     sessionKey: options.agentSessionKey,
     config: cfg,
   });
-  if (!resolveMemorySearchConfig(cfg, agentId)) return null;
+  const resolved = resolveMemorySearchConfig(cfg, agentId);
+  if (!resolved) {
+    log.warn(
+      `memory_search not registered: memorySearch disabled or missing for agent=${agentId} (check agents.defaults.memorySearch)`,
+    );
+    return null;
+  }
   return {
     label: "Memory Search",
     name: "memory_search",

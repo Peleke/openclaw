@@ -78,7 +78,14 @@ export function resolvePluginTools(params: {
       log.error(`plugin tool failed (${entry.pluginId}): ${String(err)}`);
       continue;
     }
-    if (!resolved) continue;
+    if (!resolved) {
+      if (entry.pluginId === "memory-core") {
+        log.warn(
+          `memory-core factory returned no tools (check agents.defaults.memorySearch enabled and provider)`,
+        );
+      }
+      continue;
+    }
     const listRaw = Array.isArray(resolved) ? resolved : [resolved];
     const list = entry.optional
       ? listRaw.filter((tool) =>

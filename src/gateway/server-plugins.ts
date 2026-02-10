@@ -40,10 +40,20 @@ export function loadGatewayPlugins(params: {
         : `[plugins] ${diag.message}`;
       if (diag.level === "error") {
         params.log.error(message);
+      } else if (diag.level === "warn") {
+        params.log.warn(message);
       } else {
         params.log.info(message);
       }
     }
+  }
+  const memoryCore = pluginRegistry.plugins.find((p) => p.id === "memory-core");
+  if (memoryCore) {
+    params.log.info(`[plugins] memory-core loaded (status=${memoryCore.status})`);
+  } else {
+    params.log.warn(
+      "[plugins] memory-core not loaded; memory_search/memory_get will not be available",
+    );
   }
   return { pluginRegistry, gatewayMethods };
 }
