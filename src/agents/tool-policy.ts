@@ -201,15 +201,23 @@ export function stripPluginOnlyAllowlist(
   const pluginTools = new Set(groups.all);
   const unknownAllowlist: string[] = [];
   let hasCoreEntry = false;
+  const hasAllowAll = normalized.includes("*");
   for (const entry of normalized) {
     const isPluginEntry =
       entry === "group:plugins" || pluginIds.has(entry) || pluginTools.has(entry);
     const expanded = expandToolGroups([entry]);
     const isCoreEntry = expanded.some((tool) => coreTools.has(tool));
     if (isCoreEntry) hasCoreEntry = true;
-    if (!isCoreEntry && !isPluginEntry) unknownAllowlist.push(entry);
+    if (!isCoreEntry && !isPluginEntry) {
+      // Don't report "*" (special wildcard) or known TOOL_GROUPS keys as "unknown";
+      // they are valid config—tools may simply not be loaded (e.g. memory-core plugin).
+      if (entry !== "*" && !(entry in TOOL_GROUPS)) {
+        unknownAllowlist.push(entry);
+      }
+    }
   }
-  const strippedAllowlist = !hasCoreEntry;
+  // When "*" is present, we allow all—no need to strip to restore core tools.
+  const strippedAllowlist = !hasCoreEntry && !hasAllowAll;
   // When an allowlist contains only plugin tools, we strip it to avoid accidentally
   // disabling core tools. Users who want additive behavior should prefer `tools.alsoAllow`.
   if (strippedAllowlist) {

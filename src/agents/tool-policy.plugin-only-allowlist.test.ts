@@ -48,4 +48,23 @@ describe("stripPluginOnlyAllowlist", () => {
     expect(policy.policy?.allow).toEqual(["read", "lobster"]);
     expect(policy.unknownAllowlist).toEqual(["lobster"]);
   });
+
+  it("does not strip when allowlist contains * (allow-all)", () => {
+    const emptyPlugins: PluginToolGroups = { all: [], byPlugin: new Map() };
+    const policy = stripPluginOnlyAllowlist(
+      { allow: ["*", "group:memory"] },
+      emptyPlugins,
+      coreTools,
+    );
+    expect(policy.policy?.allow).toEqual(["*", "group:memory"]);
+    expect(policy.unknownAllowlist).toEqual([]);
+    expect(policy.strippedAllowlist).toBe(false);
+  });
+
+  it("does not report * or known TOOL_GROUPS keys as unknown", () => {
+    const emptyPlugins: PluginToolGroups = { all: [], byPlugin: new Map() };
+    const policy = stripPluginOnlyAllowlist({ allow: ["group:memory"] }, emptyPlugins, coreTools);
+    expect(policy.policy?.allow).toBeUndefined();
+    expect(policy.unknownAllowlist).toEqual([]);
+  });
 });
