@@ -19,9 +19,16 @@ const memoryCorePlugin = {
           agentSessionKey: ctx.sessionKey,
         });
         if (!memorySearchTool || !memoryGetTool) return null;
-        return [memorySearchTool, memoryGetTool];
+        const tools = [memorySearchTool, memoryGetTool];
+        // qortex-only: register feedback tool for Thompson Sampling
+        const feedbackTool = api.runtime.tools.createMemoryFeedbackTool({
+          config: ctx.config,
+          agentSessionKey: ctx.sessionKey,
+        });
+        if (feedbackTool) tools.push(feedbackTool);
+        return tools;
       },
-      { names: ["memory_search", "memory_get"] },
+      { names: ["memory_search", "memory_get", "memory_feedback"] },
     );
 
     api.registerCli(

@@ -314,7 +314,18 @@ export const MemorySearchSchema = z
       })
       .strict()
       .optional(),
-    provider: z.union([z.literal("openai"), z.literal("local"), z.literal("gemini")]).optional(),
+    provider: z
+      .union([z.literal("openai"), z.literal("local"), z.literal("gemini"), z.literal("qortex")])
+      .optional(),
+    qortex: z
+      .object({
+        command: z.string().optional(),
+        domains: z.array(z.string()).optional(),
+        topK: z.number().int().positive().optional(),
+        feedback: z.boolean().optional(),
+      })
+      .strict()
+      .optional(),
     remote: z
       .object({
         baseUrl: z.string().optional(),

@@ -54,6 +54,9 @@ describe("loadGatewayPlugins", () => {
     expect(log.error).toHaveBeenCalledWith(
       "[plugins] failed to load plugin: boom (plugin=telegram, source=/tmp/telegram/index.ts)",
     );
-    expect(log.warn).not.toHaveBeenCalled();
+    // memory-core is not in the mock registry, so a warn is expected
+    expect(log.warn).toHaveBeenCalledWith(
+      "[plugins] memory-core not loaded; memory_search/memory_get will not be available",
+    );
   });
 });

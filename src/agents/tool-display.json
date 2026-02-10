@@ -286,6 +286,11 @@
       "title": "Memory Get",
       "detailKeys": ["path", "from", "lines"]
     },
+    "memory_feedback": {
+      "emoji": "🧠",
+      "title": "Memory Feedback",
+      "detailKeys": ["query_id", "item_id", "outcome"]
+    },
     "web_search": {
       "emoji": "🔎",
       "title": "Web Search",

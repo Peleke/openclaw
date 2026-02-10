@@ -337,6 +337,12 @@ export function discoverOpenClawPlugins(params: {
       diagnostics,
       seen,
     });
+  } else {
+    diagnostics.push({
+      level: "warn",
+      message: `OPENCLAW_BUNDLED_PLUGINS_DIR unset and extensions/ not found (walk-up from dist/ and cwd failed); memory-core and other bundled plugins will not load`,
+      source: "discovery",
+    });
   }
 
   return { candidates, diagnostics };

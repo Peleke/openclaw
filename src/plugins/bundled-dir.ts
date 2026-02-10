@@ -29,5 +29,14 @@ export function resolveBundledPluginsDir(): string | undefined {
     // ignore
   }
 
+  // Fallback: gateway runs with WorkingDirectory = package root (e.g. /workspace).
+  // If walk-up failed (overlay mounts, symlinks), extensions/ relative to cwd usually works.
+  try {
+    const cwdExt = path.join(process.cwd(), "extensions");
+    if (fs.existsSync(cwdExt)) return cwdExt;
+  } catch {
+    // ignore
+  }
+
   return undefined;
 }
