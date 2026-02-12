@@ -1,14 +1,30 @@
 /**
  * CLI status report for learning layer observability.
- * Supports both local DB reads and pre-fetched API data.
+ * Sources data from qortex via gateway API or direct MCP connection.
  */
 
-import type { DatabaseSync } from "node:sqlite";
-import type { LearningConfig } from "./types.js";
-import { getTraceSummary, loadPosteriors, getBaselineComparison } from "./store.js";
-import type { TraceSummary, BaselineComparison } from "./store.js";
 import { renderTable, type TableColumn } from "../terminal/table.js";
 import { theme } from "../terminal/theme.js";
+
+// -- Summary/baseline shapes (used by renderer + API types) --
+
+export type TraceSummary = {
+  traceCount: number;
+  armCount: number;
+  totalTokens: number;
+  minTimestamp: number | null;
+  maxTimestamp: number | null;
+};
+
+export type BaselineComparison = {
+  baselineRuns: number;
+  selectedRuns: number;
+  baselineAvgTokens: number | null;
+  selectedAvgTokens: number | null;
+  tokenSavingsPercent: number | null;
+  baselineAvgDuration: number | null;
+  selectedAvgDuration: number | null;
+};
 
 // -- Types for API-sourced data --
 
@@ -19,11 +35,9 @@ export type LearningStatusApiData = {
   config: {
     enabled?: boolean;
     phase: string;
-    strategy?: string;
     tokenBudget?: number;
     baselineRate?: number;
     minPulls?: number;
-    seedArmIds?: string[];
   };
   posteriors: Array<{
     armId: string;
@@ -75,7 +89,9 @@ function renderLearningStatus(data: LearningRenderData): string {
 
   if (summary.traceCount === 0) {
     lines.push(
-      theme.muted("No traces recorded yet. Run some agent messages to start collecting data."),
+      theme.muted(
+        "No observations recorded yet. Run some agent messages to start collecting data.",
+      ),
     );
     return lines.join("\n");
   }
@@ -86,7 +102,7 @@ function renderLearningStatus(data: LearningRenderData): string {
       : "\u2013";
 
   lines.push(
-    `  Traces: ${theme.accent(String(summary.traceCount))}    Arms: ${theme.accent(String(summary.armCount))}    Tokens: ${theme.accent(summary.totalTokens.toLocaleString())}    Range: ${theme.muted(dateRange)}`,
+    `  Observations: ${theme.accent(String(summary.traceCount))}    Arms: ${theme.accent(String(summary.armCount))}    Tokens: ${theme.accent(summary.totalTokens.toLocaleString())}    Range: ${theme.muted(dateRange)}`,
   );
   lines.push("");
 
@@ -132,7 +148,7 @@ function renderLearningStatus(data: LearningRenderData): string {
     armId: p.armId,
     mean: p.mean.toFixed(3),
     pulls: String(p.pulls),
-    lastUpdated: new Date(p.lastUpdated).toLocaleDateString(),
+    lastUpdated: p.lastUpdated ? new Date(p.lastUpdated).toLocaleDateString() : "\u2013",
   });
 
   // Top 5
@@ -152,45 +168,7 @@ function renderLearningStatus(data: LearningRenderData): string {
   return lines.join("\n");
 }
 
-// -- Public: DB-based (existing) --
-
-export type FormatLearningStatusOpts = {
-  db: DatabaseSync;
-  config?: LearningConfig | null;
-};
-
-export function formatLearningStatus(dbOrOpts: DatabaseSync | FormatLearningStatusOpts): string {
-  // Support both old signature (db only) and new signature (opts object)
-  const opts: FormatLearningStatusOpts = "db" in dbOrOpts ? dbOrOpts : { db: dbOrOpts };
-  const { db, config } = opts;
-
-  const summary = getTraceSummary(db);
-  const baseline = getBaselineComparison(db);
-  const phase = config?.phase ?? "passive";
-
-  const configParts: string[] = [];
-  if (config) {
-    if (config.tokenBudget) configParts.push(`Budget: ${config.tokenBudget.toLocaleString()}`);
-    if (config.baselineRate != null)
-      configParts.push(`Baseline: ${(config.baselineRate * 100).toFixed(0)}%`);
-    if (config.minPulls) configParts.push(`Min pulls: ${config.minPulls}`);
-  }
-
-  const posteriorMap = loadPosteriors(db);
-  const posteriors = Array.from(posteriorMap.values())
-    .map((p) => ({ ...p, mean: p.alpha / (p.alpha + p.beta) }))
-    .sort((a, b) => b.mean - a.mean);
-
-  return renderLearningStatus({
-    phase,
-    configParts,
-    summary,
-    baseline,
-    posteriors,
-  });
-}
-
-// -- Public: API-data-based (new) --
+// -- Public: API-data-based --
 
 export function formatLearningStatusFromApi(data: LearningStatusApiData): string {
   const { summary, config, posteriors } = data;
@@ -209,4 +187,72 @@ export function formatLearningStatusFromApi(data: LearningStatusApiData): string
     baseline: summary.baseline,
     posteriors,
   });
+}
+
+// -- Public: Direct qortex MCP connection (CLI fallback when gateway unreachable) --
+
+export async function formatLearningStatusFromQortex(): Promise<string> {
+  const { QortexMcpConnection, parseCommandString } = await import("../qortex/connection.js");
+  const { QortexLearningClient } = await import("./qortex-client.js");
+  const { loadConfig } = await import("../config/io.js");
+
+  const cfg = loadConfig();
+  const learningCfg = cfg?.learning;
+  const qortexCmd = learningCfg?.qortex?.command ?? "uvx qortex mcp-serve";
+
+  const conn = new QortexMcpConnection(parseCommandString(qortexCmd));
+  try {
+    await conn.init();
+    const client = new QortexLearningClient(conn, learningCfg?.learnerName);
+
+    const [metrics, posteriorsResult] = await Promise.all([client.metrics(), client.posteriors()]);
+
+    if (!metrics) {
+      return theme.error("Failed to connect to qortex learning backend.");
+    }
+
+    const posteriors = posteriorsResult
+      ? Object.entries(posteriorsResult.posteriors)
+          .map(([armId, state]) => ({
+            armId,
+            alpha: state.alpha,
+            beta: state.beta,
+            pulls: state.pulls,
+            mean: state.mean,
+            lastUpdated: new Date(state.last_updated).getTime() || 0,
+          }))
+          .sort((a, b) => b.mean - a.mean)
+      : [];
+
+    const configParts: string[] = [];
+    if (learningCfg?.tokenBudget)
+      configParts.push(`Budget: ${learningCfg.tokenBudget.toLocaleString()}`);
+    if (learningCfg?.baselineRate != null)
+      configParts.push(`Baseline: ${(learningCfg.baselineRate * 100).toFixed(0)}%`);
+    if (learningCfg?.minPulls) configParts.push(`Min pulls: ${learningCfg.minPulls}`);
+
+    return renderLearningStatus({
+      phase: learningCfg?.phase ?? "passive",
+      configParts,
+      summary: {
+        traceCount: metrics.total_pulls,
+        armCount: metrics.arm_count,
+        totalTokens: 0,
+        minTimestamp: null,
+        maxTimestamp: null,
+      },
+      baseline: {
+        baselineRuns: 0,
+        selectedRuns: metrics.total_pulls,
+        baselineAvgTokens: null,
+        selectedAvgTokens: null,
+        tokenSavingsPercent: null,
+        baselineAvgDuration: null,
+        selectedAvgDuration: null,
+      },
+      posteriors,
+    });
+  } finally {
+    await conn.close();
+  }
 }

@@ -87,6 +87,8 @@ type CreateMemorySearchTool =
 type CreateMemoryFeedbackTool =
   typeof import("../../agents/tools/memory-tool.js").createMemoryFeedbackTool;
 type RegisterMemoryCli = typeof import("../../cli/memory-cli.js").registerMemoryCli;
+type GetSharedQortexConnection =
+  typeof import("../../qortex/connection.js").getSharedQortexConnection;
 type DiscordMessageActions =
   typeof import("../../channels/plugins/actions/discord.js").discordMessageActions;
 type AuditDiscordChannelPermissions =
@@ -204,6 +206,7 @@ export type PluginRuntime = {
     createMemorySearchTool: CreateMemorySearchTool;
     createMemoryFeedbackTool: CreateMemoryFeedbackTool;
     registerMemoryCli: RegisterMemoryCli;
+    getSharedQortexConnection: GetSharedQortexConnection;
   };
   channel: {
     text: {

@@ -3,6 +3,7 @@ import { resolveAgentModelFallbacksOverride } from "../../agents/agent-scope.js"
 import { runWithModelFallback } from "../../agents/model-fallback.js";
 import { isCliProvider } from "../../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../../agents/pi-embedded.js";
+import { getSharedQortexConnection } from "../../qortex/connection.js";
 import { resolveSandboxConfigForAgent, resolveSandboxRuntimeStatus } from "../../agents/sandbox.js";
 import type { OpenClawConfig } from "../../config/config.js";
 import {
@@ -140,6 +141,7 @@ export async function runMemoryFlushIfNeeded(params: {
           execOverrides: params.followupRun.run.execOverrides,
           bashElevated: params.followupRun.run.bashElevated,
           timeoutMs: params.followupRun.run.timeoutMs,
+          qortexConnection: getSharedQortexConnection(),
           runId: flushRunId,
           onAgentEvent: (evt) => {
             if (evt.stream === "compaction") {

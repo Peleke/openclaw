@@ -1,52 +1,34 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import fs from "node:fs";
-import path from "node:path";
-import os from "node:os";
+import { describe, it, expect, vi } from "vitest";
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { DatabaseSync } from "node:sqlite";
-import { ensureLearningSchema, insertRunTrace, savePosterior } from "./store.js";
 import { createLearningApiHandler } from "./api.js";
-import { SEED_ARM_IDS } from "./strategy.js";
-import type { RunTrace, LearningConfig } from "./types.js";
+import type { QortexLearningClient } from "./qortex-client.js";
+import type { LearningConfig } from "./types.js";
 
-let db: DatabaseSync;
-let tmpDir: string;
-
-beforeEach(() => {
-  const { DatabaseSync: DB } = require("node:sqlite") as typeof import("node:sqlite");
-  tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "learning-api-test-"));
-  db = new DB(path.join(tmpDir, "test.db"));
-  ensureLearningSchema(db);
-});
-
-afterEach(() => {
-  db.close();
-  fs.rmSync(tmpDir, { recursive: true, force: true });
-});
-
-function makeTrace(overrides?: Partial<RunTrace>): RunTrace {
+function mockClient(overrides?: Partial<QortexLearningClient>): QortexLearningClient {
   return {
-    traceId: `trace-${Math.random().toString(36).slice(2)}`,
-    runId: "run-1",
-    sessionId: "sess-1",
-    timestamp: Date.now(),
-    isBaseline: false,
-    context: {},
-    arms: [{ armId: "tool:exec:bash", included: true, referenced: true, tokenCost: 100 }],
-    usage: { input: 300, output: 200, total: 500 },
-    systemPromptChars: 5000,
-    aborted: false,
+    isAvailable: true,
+    select: vi.fn(),
+    observe: vi.fn(),
+    posteriors: vi.fn(async () => ({
+      learner: "openclaw",
+      posteriors: {},
+    })),
+    metrics: vi.fn(async () => ({
+      learner: "openclaw",
+      total_pulls: 0,
+      total_reward: 0,
+      accuracy: 0,
+      arm_count: 0,
+      explore_ratio: 0,
+    })),
+    sessionStart: vi.fn(),
+    sessionEnd: vi.fn(),
     ...overrides,
-  };
+  } as unknown as QortexLearningClient;
 }
 
 function mockReqRes(method: string, url: string) {
-  const req = {
-    method,
-    url,
-    headers: {},
-  } as unknown as IncomingMessage;
-
+  const req = { method, url, headers: {} } as unknown as IncomingMessage;
   let statusCode = 0;
   let body = "";
   const headers: Record<string, string> = {};
@@ -64,232 +46,286 @@ function mockReqRes(method: string, url: string) {
       body = data ?? "";
     },
   } as unknown as ServerResponse;
-
   return { req, res, getStatus: () => statusCode, getBody: () => body, getHeaders: () => headers };
 }
 
 describe("learning API handler", () => {
   it("returns false for non-learning URLs", async () => {
-    const handler = createLearningApiHandler({ getDb: () => db });
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
     const { req, res } = mockReqRes("GET", "/some/other/path");
     expect(await handler(req, res)).toBe(false);
   });
 
-  it("returns 503 when DB unavailable", async () => {
-    const handler = createLearningApiHandler({ getDb: () => null });
+  it("returns 503 when client is null", async () => {
+    const handler = createLearningApiHandler({ getClient: () => null });
     const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
     expect(await handler(req, res)).toBe(true);
     expect(getStatus()).toBe(503);
   });
 
-  it("GET /summary returns summary", async () => {
-    insertRunTrace(db, makeTrace());
-    savePosterior(db, {
-      armId: "tool:exec:bash",
-      alpha: 3,
-      beta: 1,
-      pulls: 3,
-      lastUpdated: Date.now(),
-    });
+  it("returns 503 when client not connected", async () => {
+    const client = mockClient({ isAvailable: false } as unknown as Partial<QortexLearningClient>);
+    const handler = createLearningApiHandler({ getClient: () => client });
+    const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
+    expect(await handler(req, res)).toBe(true);
+    expect(getStatus()).toBe(503);
+  });
 
-    const handler = createLearningApiHandler({ getDb: () => db });
+  it("GET /summary returns metrics from qortex", async () => {
+    const client = mockClient({
+      metrics: vi.fn(async () => ({
+        learner: "openclaw",
+        total_pulls: 42,
+        total_reward: 35.5,
+        accuracy: 0.845,
+        arm_count: 7,
+        explore_ratio: 0.15,
+      })),
+    } as unknown as Partial<QortexLearningClient>);
+
+    const handler = createLearningApiHandler({ getClient: () => client });
     const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
     await handler(req, res);
     const data = JSON.parse(getBody());
-    expect(data.traceCount).toBe(1);
-    expect(data.armCount).toBe(1);
-    expect(data.totalTokens).toBe(500);
+    expect(data.traceCount).toBe(42);
+    expect(data.armCount).toBe(7);
+    expect(data.accuracy).toBe(0.845);
+    expect(data.exploreRatio).toBe(0.15);
+    expect(data.totalReward).toBe(35.5);
   });
 
-  it("GET /posteriors returns sorted posteriors", async () => {
-    savePosterior(db, { armId: "a", alpha: 5, beta: 1, pulls: 5, lastUpdated: 1000 });
-    savePosterior(db, { armId: "b", alpha: 1, beta: 5, pulls: 5, lastUpdated: 2000 });
+  it("GET /metrics is alias for /summary", async () => {
+    const client = mockClient({
+      metrics: vi.fn(async () => ({
+        learner: "openclaw",
+        total_pulls: 10,
+        total_reward: 8,
+        accuracy: 0.8,
+        arm_count: 3,
+        explore_ratio: 0.1,
+      })),
+    } as unknown as Partial<QortexLearningClient>);
 
-    const handler = createLearningApiHandler({ getDb: () => db });
+    const handler = createLearningApiHandler({ getClient: () => client });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/metrics");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+    expect(data.traceCount).toBe(10);
+  });
+
+  it("GET /summary returns 503 when metrics fail", async () => {
+    const client = mockClient({
+      metrics: vi.fn(async () => null),
+    } as unknown as Partial<QortexLearningClient>);
+
+    const handler = createLearningApiHandler({ getClient: () => client });
+    const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
+    await handler(req, res);
+    expect(getStatus()).toBe(503);
+  });
+
+  it("GET /posteriors converts map to sorted array", async () => {
+    const client = mockClient({
+      posteriors: vi.fn(async () => ({
+        learner: "openclaw",
+        posteriors: {
+          "tool:exec:bash": {
+            alpha: 5,
+            beta: 1,
+            pulls: 5,
+            total_reward: 4.2,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.833,
+          },
+          "tool:fs:Read": {
+            alpha: 1,
+            beta: 5,
+            pulls: 5,
+            total_reward: 0.8,
+            last_updated: "2025-01-02T00:00:00Z",
+            mean: 0.167,
+          },
+        },
+      })),
+    } as unknown as Partial<QortexLearningClient>);
+
+    const handler = createLearningApiHandler({ getClient: () => client });
     const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
     await handler(req, res);
     const data = JSON.parse(getBody());
     expect(data).toHaveLength(2);
-    expect(data[0].armId).toBe("a"); // higher mean
-    expect(data[0].mean).toBeGreaterThan(data[1].mean);
+    // Sorted by mean descending
+    expect(data[0].armId).toBe("tool:exec:bash");
+    expect(data[0].mean).toBe(0.833);
+    expect(data[1].armId).toBe("tool:fs:Read");
+    expect(data[1].mean).toBe(0.167);
   });
 
-  it("GET /traces supports pagination", async () => {
-    for (let i = 0; i < 5; i++) {
-      insertRunTrace(db, makeTrace({ traceId: `t${i}`, timestamp: 1000 + i }));
-    }
+  it("GET /posteriors returns 503 when posteriors fail", async () => {
+    const client = mockClient({
+      posteriors: vi.fn(async () => null),
+    } as unknown as Partial<QortexLearningClient>);
 
-    const handler = createLearningApiHandler({ getDb: () => db });
-    const { req, res, getBody } = mockReqRes(
-      "GET",
-      "/__openclaw__/api/learning/traces?limit=2&offset=1",
-    );
+    const handler = createLearningApiHandler({ getClient: () => client });
+    const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
     await handler(req, res);
-    const data = JSON.parse(getBody());
-    expect(data.total).toBe(5);
-    expect(data.traces).toHaveLength(2);
+    expect(getStatus()).toBe(503);
   });
 
-  it("GET /timeseries returns buckets", async () => {
-    insertRunTrace(db, makeTrace({ timestamp: 1000000 }));
+  it("GET /posteriors marks underexplored arms based on config minPulls", async () => {
+    const client = mockClient({
+      posteriors: vi.fn(async () => ({
+        learner: "openclaw",
+        posteriors: {
+          "low-pulls": {
+            alpha: 2,
+            beta: 1,
+            pulls: 2,
+            total_reward: 1.5,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.667,
+          },
+          "high-pulls": {
+            alpha: 8,
+            beta: 2,
+            pulls: 9,
+            total_reward: 7.2,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.8,
+          },
+        },
+      })),
+    } as unknown as Partial<QortexLearningClient>);
 
-    const handler = createLearningApiHandler({ getDb: () => db });
-    const { req, res, getBody } = mockReqRes(
-      "GET",
-      "/__openclaw__/api/learning/timeseries?metric=tokens&window=1h",
-    );
+    const config: LearningConfig = { enabled: true, phase: "active", minPulls: 5 };
+    const handler = createLearningApiHandler({ getClient: () => client, getConfig: () => config });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
     await handler(req, res);
     const data = JSON.parse(getBody());
-    expect(data.buckets).toBeDefined();
-    expect(Array.isArray(data.buckets)).toBe(true);
+
+    const underexplored = data.find((p: { armId: string }) => p.armId === "low-pulls");
+    const explored = data.find((p: { armId: string }) => p.armId === "high-pulls");
+    expect(underexplored.isUnderexplored).toBe(true);
+    expect(explored.isUnderexplored).toBe(false);
+  });
+
+  it("GET /posteriors assigns confidence levels", async () => {
+    const client = mockClient({
+      posteriors: vi.fn(async () => ({
+        learner: "openclaw",
+        posteriors: {
+          low: {
+            alpha: 2,
+            beta: 1,
+            pulls: 3,
+            total_reward: 1,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.5,
+          },
+          med: {
+            alpha: 5,
+            beta: 5,
+            pulls: 10,
+            total_reward: 5,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.5,
+          },
+          high: {
+            alpha: 20,
+            beta: 5,
+            pulls: 25,
+            total_reward: 20,
+            last_updated: "2025-01-01T00:00:00Z",
+            mean: 0.8,
+          },
+        },
+      })),
+    } as unknown as Partial<QortexLearningClient>);
+
+    const handler = createLearningApiHandler({ getClient: () => client });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+
+    expect(data.find((p: { armId: string }) => p.armId === "low").confidence).toBe("low");
+    expect(data.find((p: { armId: string }) => p.armId === "med").confidence).toBe("medium");
+    expect(data.find((p: { armId: string }) => p.armId === "high").confidence).toBe("high");
+  });
+
+  it("GET /config returns default config when getConfig not provided", async () => {
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/config");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+    expect(data.enabled).toBe(false);
+    expect(data.phase).toBe("passive");
+    expect(data.tokenBudget).toBe(8000);
+    expect(data.baselineRate).toBe(0.1);
+    expect(data.minPulls).toBe(5);
+    expect(data.backend).toBe("qortex");
+  });
+
+  it("GET /config returns actual config when provided", async () => {
+    const config: LearningConfig = {
+      enabled: true,
+      phase: "active",
+      tokenBudget: 4000,
+      baselineRate: 0.2,
+      minPulls: 10,
+    };
+    const handler = createLearningApiHandler({
+      getClient: () => mockClient(),
+      getConfig: () => config,
+    });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/config");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+    expect(data.enabled).toBe(true);
+    expect(data.phase).toBe("active");
+    expect(data.tokenBudget).toBe(4000);
+  });
+
+  it("GET /traces returns placeholder", async () => {
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/traces");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+    expect(data.traces).toEqual([]);
+    expect(data.total).toBe(0);
+  });
+
+  it("GET /timeseries returns placeholder", async () => {
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
+    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/timeseries");
+    await handler(req, res);
+    const data = JSON.parse(getBody());
+    expect(data.buckets).toEqual([]);
   });
 
   it("returns 404 for unknown routes", async () => {
-    const handler = createLearningApiHandler({ getDb: () => db });
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
     const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/unknown");
     await handler(req, res);
     expect(getStatus()).toBe(404);
   });
 
-  it("returns 405 for non-GET methods", async () => {
-    const handler = createLearningApiHandler({ getDb: () => db });
+  it("returns 405 for non-GET methods on data routes", async () => {
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
     const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/summary");
     await handler(req, res);
     expect(getStatus()).toBe(405);
   });
 
-  it("handles empty DB gracefully", async () => {
-    const handler = createLearningApiHandler({ getDb: () => db });
-    const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
+  it("sets CORS header on responses", async () => {
+    const handler = createLearningApiHandler({ getClient: () => mockClient() });
+    const { req, res, getHeaders } = mockReqRes("GET", "/__openclaw__/api/learning/config");
     await handler(req, res);
-    const data = JSON.parse(getBody());
-    expect(data.traceCount).toBe(0);
-    expect(data.totalTokens).toBe(0);
-  });
-
-  describe("/config endpoint", () => {
-    it("returns default config when getConfig not provided", async () => {
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/config");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-      expect(data.enabled).toBe(false);
-      expect(data.phase).toBe("passive");
-      expect(data.tokenBudget).toBe(8000);
-      expect(data.baselineRate).toBe(0.1);
-      expect(data.minPulls).toBe(5);
-      expect(data.seedArmIds).toEqual(SEED_ARM_IDS);
-    });
-
-    it("returns actual config when getConfig provided", async () => {
-      const config: LearningConfig = {
-        enabled: true,
-        phase: "active",
-        tokenBudget: 4000,
-        baselineRate: 0.2,
-        minPulls: 10,
-      };
-      const handler = createLearningApiHandler({ getDb: () => db, getConfig: () => config });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/config");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-      expect(data.enabled).toBe(true);
-      expect(data.phase).toBe("active");
-      expect(data.tokenBudget).toBe(4000);
-      expect(data.baselineRate).toBe(0.2);
-      expect(data.minPulls).toBe(10);
-    });
-  });
-
-  describe("/posteriors with Thompson context", () => {
-    it("includes credible intervals", async () => {
-      savePosterior(db, {
-        armId: "tool:exec:Bash",
-        alpha: 10,
-        beta: 2,
-        pulls: 11,
-        lastUpdated: 1000,
-      });
-
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      expect(data[0].credibleInterval).toBeDefined();
-      expect(data[0].credibleInterval.lower).toBeGreaterThanOrEqual(0);
-      expect(data[0].credibleInterval.upper).toBeLessThanOrEqual(1);
-      expect(data[0].credibleInterval.lower).toBeLessThan(data[0].credibleInterval.upper);
-    });
-
-    it("marks seed arms correctly", async () => {
-      savePosterior(db, {
-        armId: "tool:fs:Read",
-        alpha: 5,
-        beta: 1,
-        pulls: 5,
-        lastUpdated: 1000,
-      });
-      savePosterior(db, {
-        armId: "tool:custom:foo",
-        alpha: 5,
-        beta: 1,
-        pulls: 5,
-        lastUpdated: 1000,
-      });
-
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      const seedArm = data.find((p: { armId: string }) => p.armId === "tool:fs:Read");
-      const nonSeedArm = data.find((p: { armId: string }) => p.armId === "tool:custom:foo");
-
-      expect(seedArm.isSeed).toBe(true);
-      expect(nonSeedArm.isSeed).toBe(false);
-    });
-
-    it("marks underexplored arms based on config", async () => {
-      savePosterior(db, { armId: "arm-1", alpha: 3, beta: 1, pulls: 2, lastUpdated: 1000 });
-      savePosterior(db, { armId: "arm-2", alpha: 8, beta: 2, pulls: 9, lastUpdated: 1000 });
-
-      const config: LearningConfig = { enabled: true, phase: "active", minPulls: 5 };
-      const handler = createLearningApiHandler({ getDb: () => db, getConfig: () => config });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      const underexplored = data.find((p: { armId: string }) => p.armId === "arm-1");
-      const explored = data.find((p: { armId: string }) => p.armId === "arm-2");
-
-      expect(underexplored.isUnderexplored).toBe(true);
-      expect(explored.isUnderexplored).toBe(false);
-    });
-
-    it("includes confidence levels", async () => {
-      savePosterior(db, { armId: "low", alpha: 2, beta: 1, pulls: 2, lastUpdated: 1000 });
-      savePosterior(db, { armId: "medium", alpha: 8, beta: 2, pulls: 9, lastUpdated: 1000 });
-      savePosterior(db, { armId: "high", alpha: 20, beta: 5, pulls: 24, lastUpdated: 1000 });
-
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/posteriors");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      const low = data.find((p: { armId: string }) => p.armId === "low");
-      const medium = data.find((p: { armId: string }) => p.armId === "medium");
-      const high = data.find((p: { armId: string }) => p.armId === "high");
-
-      expect(low.confidence).toBe("low");
-      expect(medium.confidence).toBe("medium");
-      expect(high.confidence).toBe("high");
-    });
+    expect(getHeaders()["Access-Control-Allow-Origin"]).toBeDefined();
   });
 
   describe("GET /dashboard", () => {
     it("returns HTML dashboard", async () => {
-      const handler = createLearningApiHandler({ getDb: () => db });
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
       const { req, res, getBody, getStatus, getHeaders } = mockReqRes(
         "GET",
         "/__openclaw__/api/learning/dashboard",
@@ -301,11 +337,10 @@ describe("learning API handler", () => {
       expect(getHeaders()["Cache-Control"]).toBe("no-store");
       expect(getBody()).toContain("<!DOCTYPE html>");
       expect(getBody()).toContain("Learning Dashboard");
-      expect(getBody()).toContain("chart.js");
     });
 
-    it("serves dashboard even when DB is null", async () => {
-      const handler = createLearningApiHandler({ getDb: () => null });
+    it("serves dashboard even when client is null", async () => {
+      const handler = createLearningApiHandler({ getClient: () => null });
       const { req, res, getBody, getStatus } = mockReqRes(
         "GET",
         "/__openclaw__/api/learning/dashboard",
@@ -316,18 +351,8 @@ describe("learning API handler", () => {
       expect(getBody()).toContain("Learning Dashboard");
     });
 
-    it("uses relative apiBase in generated HTML", async () => {
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/dashboard");
-      await handler(req, res);
-
-      // apiBase should be relative, not absolute with host
-      expect(getBody()).toContain('"/__openclaw__/api/learning"');
-      expect(getBody()).not.toContain("http://");
-    });
-
     it("returns 405 for non-GET methods on dashboard", async () => {
-      const handler = createLearningApiHandler({ getDb: () => db });
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
 
       for (const method of ["POST", "PUT", "DELETE"]) {
         const { req, res, getStatus } = mockReqRes(method, "/__openclaw__/api/learning/dashboard");
@@ -337,7 +362,7 @@ describe("learning API handler", () => {
     });
 
     it("handles trailing slash on dashboard route", async () => {
-      const handler = createLearningApiHandler({ getDb: () => db });
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
       const { req, res, getStatus, getBody } = mockReqRes(
         "GET",
         "/__openclaw__/api/learning/dashboard/",
@@ -348,9 +373,8 @@ describe("learning API handler", () => {
       expect(getBody()).toContain("Learning Dashboard");
     });
 
-    it("bypasses DB null-check (serves before DB gate)", async () => {
-      const handler = createLearningApiHandler({ getDb: () => null });
-      // Non-dashboard routes should return 503 when DB is null
+    it("bypasses client null-check (serves before client gate)", async () => {
+      const handler = createLearningApiHandler({ getClient: () => null });
       const {
         req: reqSummary,
         res: resSummary,
@@ -359,7 +383,6 @@ describe("learning API handler", () => {
       await handler(reqSummary, resSummary);
       expect(getSumStatus()).toBe(503);
 
-      // Dashboard should still work
       const {
         req: reqDash,
         res: resDash,
@@ -367,39 +390,6 @@ describe("learning API handler", () => {
       } = mockReqRes("GET", "/__openclaw__/api/learning/dashboard");
       await handler(reqDash, resDash);
       expect(getDashStatus()).toBe(200);
-    });
-  });
-
-  describe("/summary with baseline comparison", () => {
-    it("includes baseline comparison stats", async () => {
-      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1000 } }));
-      insertRunTrace(db, makeTrace({ isBaseline: true, usage: { total: 1200 } }));
-      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 800 } }));
-      insertRunTrace(db, makeTrace({ isBaseline: false, usage: { total: 600 } }));
-
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      expect(data.baseline).toBeDefined();
-      expect(data.baseline.baselineRuns).toBe(2);
-      expect(data.baseline.selectedRuns).toBe(2);
-      expect(data.baseline.baselineAvgTokens).toBe(1100); // (1000+1200)/2
-      expect(data.baseline.selectedAvgTokens).toBe(700); // (800+600)/2
-      expect(data.baseline.tokenSavingsPercent).toBeCloseTo(36.36, 1); // (1100-700)/1100*100
-    });
-
-    it("handles no baseline runs gracefully", async () => {
-      insertRunTrace(db, makeTrace({ isBaseline: false }));
-
-      const handler = createLearningApiHandler({ getDb: () => db });
-      const { req, res, getBody } = mockReqRes("GET", "/__openclaw__/api/learning/summary");
-      await handler(req, res);
-      const data = JSON.parse(getBody());
-
-      expect(data.baseline.baselineRuns).toBe(0);
-      expect(data.baseline.tokenSavingsPercent).toBeNull();
     });
   });
 });
