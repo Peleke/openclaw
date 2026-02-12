@@ -3,14 +3,23 @@ import path from "node:path";
 
 import { resolveAgentDir, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
   QortexMcpConnection,
   parseCommandString,
   parseToolResult as sharedParseToolResult,
 } from "../../qortex/connection.js";
 import type { QortexConnection } from "../../qortex/types.js";
+import { listMemoryFiles, buildFileEntry, hashText } from "../internal.js";
 import type { MemorySearchResult } from "../manager.js";
-import type { MemoryProvider, MemoryProviderStatus, SyncResult } from "./types.js";
+import type {
+  MemoryProvider,
+  MemoryProviderHooks,
+  MemoryProviderStatus,
+  SyncResult,
+} from "./types.js";
+
+const log = createSubsystemLogger("qortex-memory");
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -29,6 +38,7 @@ const DEFAULT_TOP_K = 10;
 // Timeouts (ms)
 const QUERY_TIMEOUT_MS = 30_000;
 const FEEDBACK_TIMEOUT_MS = 10_000;
+const INGEST_TIMEOUT_MS = 60_000;
 
 // ── Result mapping (qortex QueryItem → MemorySearchResult) ─────────────────
 
@@ -79,6 +89,11 @@ export class QortexMemoryProvider implements MemoryProvider {
   private ownedConnection: QortexConnection | null = null;
   private sharedConnection: QortexConnection | null = null;
   private lastQueryId: string | null = null;
+  /** Content hashes from last sync — skip re-ingest for unchanged files. */
+  private ingestedHashes = new Map<string, string>();
+  /** Whether we've ever synced (for onFirstSync hook). */
+  private hasSynced = false;
+  hooks: MemoryProviderHooks = {};
 
   constructor(
     private config: QortexProviderConfig,
@@ -137,18 +152,16 @@ export class QortexMemoryProvider implements MemoryProvider {
     from?: number;
     lines?: number;
   }): Promise<{ text: string; path: string }> {
-    // qortex doesn't serve files — read locally, same as SQLite provider.
     const agentDir = resolveAgentDir(this.cfg, this.agentId);
     const workspaceDir = resolveAgentWorkspaceDir(this.cfg, this.agentId);
 
-    // Resolve candidate paths and validate they stay within expected dirs
+    // Try filesystem first
     const candidates = [
       { base: workspaceDir, resolved: path.resolve(workspaceDir, params.relPath) },
       { base: agentDir, resolved: path.resolve(agentDir, params.relPath) },
     ];
 
     for (const { base, resolved } of candidates) {
-      // Path traversal guard: resolved path must be under the base dir
       if (!resolved.startsWith(base + path.sep) && resolved !== base) continue;
       try {
         const raw = await fs.readFile(resolved, "utf8");
@@ -156,19 +169,92 @@ export class QortexMemoryProvider implements MemoryProvider {
         const start = params.from ?? 0;
         const end = params.lines ? start + params.lines : allLines.length;
         const text = allLines.slice(start, end).join("\n");
+
+        // Async: sync this file to DB if content changed
+        const hash = hashText(raw);
+        if (this.ingestedHashes.get(params.relPath) !== hash && this.connected) {
+          this.sync({ reason: `readFile:${params.relPath}` }).catch((err) =>
+            log.warn(`background sync after readFile failed: ${err}`),
+          );
+        }
+
         return { text, path: resolved };
       } catch {
         continue;
       }
     }
-    throw new Error(`File not found: ${params.relPath}`);
+
+    // File not found — fall back to DB via search
+    if (this.connected) {
+      try {
+        const results = await this.search(`file:${params.relPath}`, { maxResults: 1 });
+        if (results.length > 0 && results[0]!.snippet) {
+          log.info(`readFile: serving ${params.relPath} from DB (file not on disk)`);
+          return { text: results[0]!.snippet, path: params.relPath };
+        }
+      } catch (err) {
+        log.warn(`readFile: DB fallback failed for ${params.relPath}: ${err}`);
+      }
+    }
+
+    return { text: "", path: params.relPath };
   }
 
-  async sync(_params?: { reason?: string; force?: boolean }): Promise<SyncResult> {
+  async sync(params?: { reason?: string; force?: boolean }): Promise<SyncResult> {
     this.assertConnected();
-    // qortex_ingest takes a source_path + domain, not a bulk sync.
-    // For now, report no-op — real sync will be wired via Cadence events.
-    return { indexed: 0, skipped: 0, errors: [] };
+    const workspaceDir = resolveAgentWorkspaceDir(this.cfg, this.agentId);
+    const extraPaths = this.cfg.agents?.defaults?.memorySearch?.extraPaths;
+    const files = await listMemoryFiles(workspaceDir, extraPaths);
+
+    const result: SyncResult = { indexed: 0, skipped: 0, errors: [] };
+    const isFirst = !this.hasSynced && this.ingestedHashes.size === 0;
+    const domain = this.config.domains[0] ?? `memory/${this.agentId}`;
+
+    for (const absPath of files) {
+      try {
+        const entry = await buildFileEntry(absPath, workspaceDir);
+        const prevHash = this.ingestedHashes.get(entry.path);
+
+        // Skip unchanged files unless forced
+        if (!params?.force && prevHash === entry.hash) {
+          result.skipped++;
+          continue;
+        }
+
+        await this.connection!.callTool(
+          "qortex_ingest",
+          {
+            source_path: absPath,
+            domain,
+            source_type: "markdown",
+          },
+          { timeout: INGEST_TIMEOUT_MS },
+        );
+
+        const oldHash = prevHash;
+        this.ingestedHashes.set(entry.path, entry.hash);
+        result.indexed++;
+
+        if (oldHash && oldHash !== entry.hash) {
+          this.hooks.onVersionChange?.(entry.path, oldHash, entry.hash);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.warn(`sync: failed to ingest ${absPath}: ${msg}`);
+        result.errors.push(msg);
+      }
+    }
+
+    this.hasSynced = true;
+    if (isFirst && result.indexed > 0) {
+      this.hooks.onFirstSync?.();
+    }
+    this.hooks.onSyncComplete?.(result);
+
+    log.info(
+      `sync: indexed=${result.indexed} skipped=${result.skipped} errors=${result.errors.length}`,
+    );
+    return result;
   }
 
   /** Send feedback on search results to improve future retrieval (Thompson Sampling). */
