@@ -43,9 +43,9 @@ import {
 } from "../pi-embedded-helpers.js";
 import { normalizeUsage, type UsageLike } from "../usage.js";
 
-import { captureAndStoreTrace } from "../../learning/trace-capture.js";
-import { openLearningDb } from "../../learning/store.js";
-import { updatePosteriors } from "../../learning/update.js";
+import { observeRunOutcomes } from "../../learning/qortex-adapter.js";
+import { QortexLearningClient } from "../../learning/qortex-client.js";
+import { QortexMcpConnection, parseCommandString } from "../../qortex/connection.js";
 import { captureAndStoreGreenTrace } from "../../green/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
@@ -651,45 +651,39 @@ export async function runEmbeddedPiAgent(
               agentDir: params.agentDir,
             });
           }
-          // Learning layer: trace capture and posterior update
-          if (params.config?.learning?.enabled && attempt.systemPromptReport) {
-            // Determine if this is a baseline run (no active selection or selection says baseline)
-            const isBaseline = attempt.learningSelection?.isBaseline ?? true;
-
-            const trace = captureAndStoreTrace({
-              runId: params.runId,
-              sessionId: params.sessionId,
-              sessionKey: params.sessionKey,
-              report: attempt.systemPromptReport,
-              assistantTexts: attempt.assistantTexts,
-              toolMetas: attempt.toolMetas,
-              usage,
-              durationMs: Date.now() - started,
-              channel: params.messageChannel ?? params.messageProvider,
-              provider,
-              model: modelId,
-              isBaseline,
-              aborted,
-              agentDir,
-              selection: attempt.learningSelection,
-            });
-
-            // Active learning: update posteriors based on outcomes
-            if (params.config.learning.phase === "active" && trace) {
+          // Learning layer: post-run observation via qortex
+          if (
+            params.config?.learning?.enabled &&
+            params.config.learning.phase === "active" &&
+            attempt.learningSelection
+          ) {
+            try {
+              const learningCfg = params.config.learning;
+              const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
+              const connConfig = parseCommandString(qortexCmd);
+              const conn = new QortexMcpConnection(connConfig);
               try {
-                const learningDb = openLearningDb(agentDir);
-                try {
-                  updatePosteriors({
-                    db: learningDb,
-                    trace,
-                    config: params.config.learning,
-                  });
-                } finally {
-                  learningDb.close();
-                }
-              } catch (err) {
-                log.debug(`learning: posterior update failed: ${String(err)}`);
+                await conn.init();
+                const client = new QortexLearningClient(conn, learningCfg.learnerName);
+                await observeRunOutcomes({
+                  client,
+                  config: learningCfg,
+                  selection: attempt.learningSelection,
+                  assistantTexts: attempt.assistantTexts,
+                  toolMetas: attempt.toolMetas,
+                  context: {
+                    phase: learningCfg.phase,
+                    session_key: params.sessionKey,
+                    channel: params.messageChannel ?? params.messageProvider,
+                    provider,
+                    model: modelId,
+                  },
+                });
+              } finally {
+                await conn.close();
               }
+            } catch (err) {
+              log.debug(`learning: post-run observation failed: ${String(err)}`);
             }
           }
 

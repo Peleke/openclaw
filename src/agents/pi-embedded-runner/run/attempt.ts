@@ -62,8 +62,9 @@ import { isAbortError } from "../abort.js";
 import { buildEmbeddedExtensionPaths } from "../extensions.js";
 import { applyExtraParamsToAgent } from "../extra-params.js";
 import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
-import { openLearningDb } from "../../../learning/store.js";
-import { selectPromptComponents, type PreRunSelectionResult } from "../../../learning/pre-run.js";
+import { selectViaQortex, type AdapterSelectionResult } from "../../../learning/qortex-adapter.js";
+import { QortexLearningClient } from "../../../learning/qortex-client.js";
+import { QortexMcpConnection, parseCommandString } from "../../../qortex/connection.js";
 import {
   logToolSchemasForGoogle,
   sanitizeSessionHistory,
@@ -240,23 +241,26 @@ export async function runEmbeddedAttempt(
           hasRepliedRef: params.hasRepliedRef,
           modelHasVision,
         });
-    // Learning layer: active arm selection (before tool sanitization)
-    let learningSelection: PreRunSelectionResult | null = null;
+    // Learning layer: active arm selection via qortex (before tool sanitization)
+    let learningSelection: AdapterSelectionResult | null = null;
     if (params.config?.learning?.phase === "active" && params.config?.learning?.enabled) {
       try {
-        const learningDb = openLearningDb(agentDir);
+        const learningCfg = params.config.learning;
+        const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
+        const connConfig = parseCommandString(qortexCmd);
+        const conn = new QortexMcpConnection(connConfig);
         try {
+          await conn.init();
+          const client = new QortexLearningClient(conn, learningCfg.learnerName);
           const runtimeChannel = normalizeMessageChannel(
             params.messageChannel ?? params.messageProvider,
           );
-          learningSelection = selectPromptComponents({
-            db: learningDb,
-            config: params.config.learning,
+          learningSelection = await selectViaQortex({
+            client,
+            config: learningCfg,
             tools: toolsRaw,
             skillEntries: skillEntries.map((s) => ({
               name: s.skill.name,
-              // Estimate skill size from file path (source content not available)
-              // Default to 1000 chars (~250 tokens) as a reasonable estimate
               promptChars: 1000,
             })),
             contextFiles: contextFiles.map((f) => ({
@@ -271,7 +275,7 @@ export async function runEmbeddedAttempt(
             },
           });
         } finally {
-          learningDb.close();
+          await conn.close();
         }
       } catch (err) {
         log.debug(`learning: pre-run selection failed: ${String(err)}`);

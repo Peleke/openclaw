@@ -104,25 +104,32 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
-  // Learning API — lazily open DB on first request
+  // Learning API — lazily connect to qortex on first request
   let handleLearningApiRequest: import("./server-http.js").HooksRequestHandler | undefined;
   try {
     const { createLearningApiHandler } = await import("../learning/api.js");
-    const { openLearningDb } = await import("../learning/store.js");
-    const { resolveOpenClawAgentDir } = await import("../agents/agent-paths.js");
-    let learningDb: import("node:sqlite").DatabaseSync | null = null;
-    const agentDir = resolveOpenClawAgentDir();
+    const { QortexLearningClient } = await import("../learning/qortex-client.js");
+    const { QortexMcpConnection, parseCommandString } = await import("../qortex/connection.js");
+    let learningClient: InstanceType<typeof QortexLearningClient> | null = null;
+    let learningConn: InstanceType<typeof QortexMcpConnection> | null = null;
+    const learningCfg = params.cfg?.learning;
+    const qortexCmd = learningCfg?.qortex?.command ?? "uvx qortex mcp-serve";
     handleLearningApiRequest = createLearningApiHandler({
-      getDb: () => {
-        if (!learningDb) {
+      getClient: () => {
+        if (!learningClient) {
           try {
-            learningDb = openLearningDb(agentDir);
+            const connConfig = parseCommandString(qortexCmd);
+            learningConn = new QortexMcpConnection(connConfig);
+            // init is async — start it but don't block; client checks isAvailable
+            learningConn.init().catch(() => {});
+            learningClient = new QortexLearningClient(learningConn, learningCfg?.learnerName);
           } catch {
             return null;
           }
         }
-        return learningDb;
+        return learningClient;
       },
+      getConfig: () => learningCfg ?? null,
     });
   } catch {
     // Learning module not available — skip

@@ -74,26 +74,21 @@ export type SelectionResult = {
   usedTokens: number;
 };
 
-export interface SelectionStrategy {
-  select(params: {
-    arms: Arm[];
-    posteriors: Map<ArmId, ArmPosterior>;
-    context: SelectionContext;
-    tokenBudget: number;
-  }): SelectionResult;
-}
-
 export type LearningConfig = {
   enabled?: boolean;
   phase?: "passive" | "active";
-  strategy?: "thompson";
   tokenBudget?: number;
   /** Fraction of runs using full prompt (counterfactual). Default 0.10. */
   baselineRate?: number;
   /** Arms with fewer than N pulls are always included. */
   minPulls?: number;
-  /** For v0.0.2 temporal decay. */
-  decayHalfLifeDays?: number;
+  /** Qortex learning backend configuration. */
+  qortex?: {
+    /** Command to spawn qortex MCP server. Default: "uvx qortex mcp-serve". */
+    command?: string;
+  };
+  /** Learner name in qortex. Default: "openclaw". */
+  learnerName?: string;
 };
 
 // -- Parsing helpers --
