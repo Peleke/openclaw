@@ -31,7 +31,7 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
-import { resolveQortexConfig, QortexMemoryProvider, parseToolResult, mapQueryItems } from "../src/memory/providers/qortex.js";
+import { resolveQortexConfig, QortexMemoryProvider, parseToolResult, mapQueryResponse } from "../src/memory/providers/qortex.js";
 
 // ── Config ───────────────────────────────────────────────────────────────────
 
@@ -142,8 +142,8 @@ async function phase1() {
   const parsed = parseToolResult(statusRaw);
   check("parseToolResult", (parsed as Record<string, unknown>).status === "ok");
 
-  const mapped = mapQueryItems(queryJson);
-  check("mapQueryItems", Array.isArray(mapped), `${mapped.length} mapped results`);
+  const mapped = mapQueryResponse(queryJson);
+  check("mapQueryResponse", Array.isArray(mapped.results), `${mapped.results.length} mapped results`);
 
   await client.close();
   log("");
@@ -169,11 +169,9 @@ async function phase2() {
   const status = provider.status();
   check("provider.status", status.available === true && status.provider === "qortex");
 
-  const results = await provider.search("dogfood test", { maxResults: 5 });
+  const { results, queryId } = await provider.search("dogfood test", { maxResults: 5 });
   check("provider.search", Array.isArray(results), `${results.length} results`);
-
-  const queryId = provider.currentQueryId;
-  check("provider.currentQueryId", typeof queryId === "string" && queryId.length > 0, queryId ?? "null");
+  check("provider.queryId", typeof queryId === "string" && queryId.length > 0, queryId ?? "null");
 
   const syncResult = await provider.sync();
   check("provider.sync", syncResult.indexed === 0 && syncResult.errors.length === 0);
