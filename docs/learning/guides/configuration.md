@@ -104,6 +104,8 @@ Fraction of runs that use the full prompt (all arms included) for counterfactual
 
 Arms with fewer than this many observations are always included (never excluded by Thompson Sampling). This ensures every arm gets enough data before the bandit can decide to drop it.
 
+This value is forwarded to the qortex backend as an exploration floor. Even when the token budget is tight, arms below the `minPulls` threshold are guaranteed inclusion.
+
 ### `decayHalfLifeDays` (future)
 
 | | |

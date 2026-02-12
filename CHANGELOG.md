@@ -2,6 +2,13 @@
 
 Docs: https://docs.openclaw.ai
 
+## 2026.2.12
+
+### Fixes
+- Learning: forward `minPulls` exploration floor to qortex backend so underexplored arms are always included during active selection. (#79)
+- Learning: inject excluded-tools guidance into the system prompt when tools are excluded by the bandit, so the model can explain unavailability instead of producing empty responses. (#79)
+- Learning: normalize qortex Arm objects to string IDs at the client boundary, fixing selection mapping when qortex returns `{id, metadata, token_cost}` objects. (#82)
+
 ## 2026.1.29
 Status: stable.
 
