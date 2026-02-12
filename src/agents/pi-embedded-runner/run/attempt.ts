@@ -288,7 +288,7 @@ export async function runEmbeddedAttempt(
           if (ownsConn) await conn.close();
         }
       } catch (err) {
-        log.debug(`learning: pre-run selection failed: ${String(err)}`);
+        log.warn(`learning: pre-run selection failed: ${String(err)}`);
       }
     }
 

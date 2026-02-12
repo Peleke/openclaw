@@ -110,10 +110,22 @@ export type QortexSessionEndResult = {
 // ── Client ───────────────────────────────────────────────────────────────────
 
 export class QortexLearningClient {
+  private readonly _warnedMethods = new Set<string>();
+
   constructor(
     private readonly connection: QortexConnection,
     private readonly learnerName: string = "openclaw",
   ) {}
+
+  /** Log warn on first call per method, debug on subsequent calls. */
+  private warnOnce(method: string, msg: string): void {
+    if (this._warnedMethods.has(method)) {
+      log.debug(msg);
+    } else {
+      this._warnedMethods.add(method);
+      log.warn(msg);
+    }
+  }
 
   get isAvailable(): boolean {
     return this.connection.isConnected;
@@ -155,7 +167,7 @@ export class QortexLearningClient {
       )) as QortexSelectResult;
       return result;
     } catch (err) {
-      log.debug(`qortex learning select failed, falling back to all: ${String(err)}`);
+      this.warnOnce("select", `qortex learning select failed, falling back to all: ${String(err)}`);
       return this.fallbackSelectAll(candidates, opts?.token_budget);
     }
   }
@@ -185,7 +197,7 @@ export class QortexLearningClient {
         { timeout: OBSERVE_TIMEOUT_MS },
       )) as QortexObserveResult;
     } catch (err) {
-      log.debug(`qortex learning observe failed: ${String(err)}`);
+      this.warnOnce("observe", `qortex learning observe failed: ${String(err)}`);
       return null;
     }
   }
