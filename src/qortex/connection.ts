@@ -15,6 +15,21 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 const INIT_TIMEOUT_MS = 15_000;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 
+// Env var prefixes to forward to the qortex subprocess.
+// StdioClientTransport only inherits HOME/PATH/USER/etc by default;
+// qortex needs QORTEX_* and OTEL_* for observability, VIRTUAL_ENV for venv.
+const FORWARDED_ENV_PREFIXES = ["QORTEX_", "OTEL_", "VIRTUAL_ENV"];
+
+function collectForwardedEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (value !== undefined && FORWARDED_ENV_PREFIXES.some((p) => key.startsWith(p))) {
+      env[key] = value;
+    }
+  }
+  return env;
+}
+
 // Command validation: only allow known-safe binaries to spawn.
 const ALLOWED_COMMANDS = new Set(["uvx", "uv", "python", "python3", "qortex"]);
 
@@ -54,6 +69,8 @@ export function parseToolResult(result: Awaited<ReturnType<Client["callTool"]>>)
 export type QortexConnectionConfig = {
   command: string;
   args: string[];
+  /** Extra env vars to pass to the subprocess (merged with MCP SDK defaults). */
+  env?: Record<string, string>;
 };
 
 /**
@@ -79,6 +96,7 @@ export class QortexMcpConnection {
     this.transport = new StdioClientTransport({
       command: this.config.command,
       args: this.config.args,
+      env: { ...collectForwardedEnv(), ...this.config.env },
       stderr: "pipe",
     });
 
