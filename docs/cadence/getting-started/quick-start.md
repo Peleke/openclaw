@@ -63,14 +63,7 @@ The `::publish` marker tells the insight extractor that this content is worth ex
 
 ## 4. Wait for the digest
 
-After writing, the pipeline:
-
-1. **Detects** the file change (within seconds)
-2. **Debounces** rapid edits (waits 2 seconds for you to stop typing)
-3. **Extracts** insights via LLM (topic, hook, excerpt, scores)
-4. **Queues** the insight in a local JSONL file
-5. **Flushes** when conditions are met (enough insights, enough time, or the nightly schedule fires)
-6. **Delivers** a formatted digest to your Telegram
+After writing, the pipeline runs through several stages. It detects the file change within seconds, then debounces for 2 seconds to let rapid edits settle. Once stable, it sends the content to an LLM for insight extraction (topic, hook, excerpt, scores) and queues the result in a local JSONL file. The queue flushes when enough insights accumulate, enough time passes, or the nightly schedule fires. The formatted digest then goes to your Telegram.
 
 For testing, the nightly schedule at 21:00 will flush all queued insights regardless of count or cooldown.
 
@@ -94,10 +87,10 @@ Reply to draft any of these
 
 The Obsidian watcher (a **source**) detected your file edit and emitted an `obsidian.note.modified` **signal**. The insight extractor (a **responder**) filtered for the `::publish` marker, sent the content to an LLM, and emitted a `journal.insight.extracted` signal. The digest responder (another **responder**) queued the insight and flushed it on schedule. The Telegram notifier (a third **responder**) formatted and delivered the message.
 
-No polling. No manual commands. The gateway reacted to an event.
+The gateway reacted to a file event without any polling or manual commands.
 
 ## Next steps
 
-- [Core Concepts](concepts.md) — Understand signals, sources, and responders
-- [Configuration](../guides/configuration.md) — Tune extraction, digest timing, quiet hours
-- [Signal Reference](../reference/signals.md) — All 17 signal types
+- [Core Concepts](concepts.md): Understand signals, sources, and responders
+- [Configuration](../guides/configuration.md): Tune extraction, digest timing, quiet hours
+- [Signal Reference](../reference/signals.md): All 17 signal types

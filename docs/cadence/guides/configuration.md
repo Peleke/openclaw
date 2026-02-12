@@ -51,7 +51,7 @@ Cadence is configured via `~/.openclaw/cadence.json`. The gateway reads this fil
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `enabled` | `boolean` | `false` | Whether Cadence starts with the gateway |
-| `vaultPath` | `string` | — | Absolute path to the Obsidian vault to watch |
+| `vaultPath` | `string` | (none) | Absolute path to the Obsidian vault to watch |
 
 ## Delivery
 
@@ -60,7 +60,7 @@ Controls where digests are sent.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `delivery.channel` | `"telegram" \| "discord" \| "log"` | `"log"` | Delivery channel |
-| `delivery.telegramChatId` | `string` | — | Telegram chat ID (required when channel is `"telegram"`) |
+| `delivery.telegramChatId` | `string` | (none) | Telegram chat ID (required when channel is `"telegram"`) |
 
 ## Pillars
 
@@ -120,11 +120,11 @@ A digest flushes when any of these conditions are met:
 
 1. **Count trigger:** Queued insights >= `minToFlush`, all past cooldown, not in quiet hours
 2. **Time trigger:** Hours since last flush >= `maxHoursBetween`, at least one insight past cooldown, not in quiet hours
-3. **Cron trigger:** A scheduled job fires — bypasses quiet hours and cooldown entirely
+3. **Cron trigger:** A scheduled job fires. This bypasses quiet hours and cooldown entirely.
 
 ### Quiet hours
 
-During quiet hours (default 22:00-08:00), automatic flushes are suppressed. Scheduled cron jobs override this — if you set `nightlyDigest: "21:00"`, that flush happens even though 21:00 is close to quiet hours, because cron triggers bypass all filters.
+During quiet hours (default 22:00-08:00), automatic flushes are suppressed. Scheduled cron jobs override this. If you set `nightlyDigest: "21:00"`, that flush still happens because cron triggers bypass all filters.
 
 ### Cooldown
 
@@ -137,15 +137,15 @@ Controls time-based triggers via the CronBridge source.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `schedule.enabled` | `boolean` | `false` | Whether scheduled jobs are active |
-| `schedule.nightlyDigest` | `string` | — | Time for nightly digest flush (e.g., `"21:00"`) |
-| `schedule.morningStandup` | `string` | — | Time for morning signal (e.g., `"08:00"`) |
+| `schedule.nightlyDigest` | `string` | (none) | Time for nightly digest flush (e.g., `"21:00"`) |
+| `schedule.morningStandup` | `string` | (none) | Time for morning signal (e.g., `"08:00"`) |
 | `schedule.timezone` | `string` | `"America/New_York"` | Timezone for all schedule times |
 
 Times are in 24-hour `"HH:MM"` format.
 
 ## Storage
 
-The digest queue is stored at `~/.openclaw/cadence/digest-queue.jsonl`. This is an append-only JSONL file with line types: `insight`, `dequeue`, `flush`, `clear`. The file is fault-tolerant — malformed lines are skipped on read.
+The digest queue is stored at `~/.openclaw/cadence/digest-queue.jsonl`. This is an append-only JSONL file with line types: `insight`, `dequeue`, `flush`, `clear`. The parser is fault-tolerant and skips malformed lines on read.
 
 ## Environment variables
 
