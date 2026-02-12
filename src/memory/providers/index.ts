@@ -1,8 +1,12 @@
 import type { OpenClawConfig } from "../../config/config.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
 import type { MemoryProvider } from "./types.js";
+
+const log = createSubsystemLogger("memory-provider");
 
 export type {
   MemoryProvider,
+  MemoryProviderHooks,
   MemoryProviderStatus,
   SyncResult,
   MemorySearchResult,
@@ -24,6 +28,10 @@ export type MemoryProviderResult = {
 export async function createMemoryProvider(
   cfg: OpenClawConfig,
   agentId: string,
+  opts?: {
+    /** Shared qortex connection — avoids spawning a per-request subprocess. */
+    qortexConnection?: import("../../qortex/types.js").QortexConnection;
+  },
 ): Promise<MemoryProviderResult> {
   try {
     const { resolveMemorySearchConfig } = await import("../../agents/memory-search.js");
@@ -33,8 +41,12 @@ export async function createMemoryProvider(
     if (resolved.provider === "qortex") {
       const { QortexMemoryProvider, resolveQortexConfig } = await import("./qortex.js");
       const qortexCfg = resolveQortexConfig(resolved.qortex, agentId);
-      const provider = new QortexMemoryProvider(qortexCfg, agentId, cfg);
+      const provider = new QortexMemoryProvider(qortexCfg, agentId, cfg, opts?.qortexConnection);
       await provider.init();
+      // Kick off initial sync in background — populates the DB from memory files
+      provider
+        .sync({ reason: "init" })
+        .catch((err) => log.warn(`background sync on init failed: ${err}`));
       return { provider };
     }
 

@@ -104,25 +104,50 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
-  // Learning API — lazily open DB on first request
+  // Shared qortex connection: one subprocess for the entire gateway lifetime.
+  // Used by learning API, learning select/observe (agent runs), memory search/get/feedback.
+  // Eagerly initialized so it's ready before the first message arrives.
+  try {
+    const { QortexMcpConnection, parseCommandString, setSharedQortexConnection } =
+      await import("../qortex/connection.js");
+    const learningCfg = params.cfg?.learning;
+    const memoryCfg = params.cfg?.agents?.defaults?.memorySearch;
+    const qortexCmd =
+      learningCfg?.qortex?.command ?? memoryCfg?.qortex?.command ?? "uvx qortex mcp-serve";
+    const connConfig = parseCommandString(qortexCmd);
+    const sharedConn = new QortexMcpConnection(connConfig);
+    try {
+      await sharedConn.init();
+      setSharedQortexConnection(sharedConn);
+    } catch (err) {
+      params.log.warn(`qortex shared connection failed to init: ${String(err)}`);
+    }
+  } catch {
+    // Qortex module not available; skip
+  }
+
+  // Learning API — uses the shared qortex connection
   let handleLearningApiRequest: import("./server-http.js").HooksRequestHandler | undefined;
   try {
     const { createLearningApiHandler } = await import("../learning/api.js");
-    const { openLearningDb } = await import("../learning/store.js");
-    const { resolveOpenClawAgentDir } = await import("../agents/agent-paths.js");
-    let learningDb: import("node:sqlite").DatabaseSync | null = null;
-    const agentDir = resolveOpenClawAgentDir();
+    const { QortexLearningClient } = await import("../learning/qortex-client.js");
+    const { getSharedQortexConnection } = await import("../qortex/connection.js");
+    let learningClient: InstanceType<typeof QortexLearningClient> | null = null;
+    const learningCfg = params.cfg?.learning;
     handleLearningApiRequest = createLearningApiHandler({
-      getDb: () => {
-        if (!learningDb) {
+      getClient: () => {
+        if (!learningClient) {
           try {
-            learningDb = openLearningDb(agentDir);
+            const conn = getSharedQortexConnection();
+            if (!conn) return null;
+            learningClient = new QortexLearningClient(conn, learningCfg?.learnerName);
           } catch {
             return null;
           }
         }
-        return learningDb;
+        return learningClient;
       },
+      getConfig: () => learningCfg ?? null,
     });
   } catch {
     // Learning module not available — skip

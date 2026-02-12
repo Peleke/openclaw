@@ -5,18 +5,12 @@ vi.mock("../infra/gateway-http.js", () => ({
 }));
 
 vi.mock("../learning/cli-status.js", () => ({
-  formatLearningStatus: vi.fn(() => "[DB] Learning status output"),
   formatLearningStatusFromApi: vi.fn(() => "[API] Learning status output"),
+  formatLearningStatusFromQortex: vi.fn(async () => "[Qortex] Learning status output"),
 }));
 
-vi.mock("../learning/store.js", () => ({
-  openLearningDb: vi.fn(() => ({
-    close: vi.fn(),
-  })),
-}));
-
-vi.mock("../agents/agent-paths.js", () => ({
-  resolveOpenClawAgentDir: vi.fn(() => "/tmp/test-agent-dir"),
+vi.mock("../learning/cli-export.js", () => ({
+  exportLearningDataFromQortex: vi.fn(async () => '{"posteriors":[]}'),
 }));
 
 vi.mock("../infra/gateway-url.js", () => ({
@@ -29,7 +23,10 @@ vi.mock("../infra/gateway-url.js", () => ({
 import { Command } from "commander";
 import { registerLearningCli } from "./learning-cli.js";
 import { fetchGatewayJson } from "../infra/gateway-http.js";
-import { formatLearningStatus, formatLearningStatusFromApi } from "../learning/cli-status.js";
+import {
+  formatLearningStatusFromApi,
+  formatLearningStatusFromQortex,
+} from "../learning/cli-status.js";
 
 afterEach(() => {
   vi.clearAllMocks();
@@ -54,11 +51,11 @@ describe("learning status CLI action", () => {
     console.log = origLog;
 
     expect(formatLearningStatusFromApi).toHaveBeenCalledOnce();
-    expect(formatLearningStatus).not.toHaveBeenCalled();
+    expect(formatLearningStatusFromQortex).not.toHaveBeenCalled();
     expect(logs.join("\n")).toContain("[API]");
   });
 
-  it("falls back to local DB when gateway returns null", async () => {
+  it("falls back to direct qortex MCP when gateway returns null", async () => {
     const mockFetch = vi.mocked(fetchGatewayJson);
     mockFetch.mockResolvedValue(null);
 
@@ -73,9 +70,9 @@ describe("learning status CLI action", () => {
 
     console.log = origLog;
 
-    expect(formatLearningStatus).toHaveBeenCalledOnce();
+    expect(formatLearningStatusFromQortex).toHaveBeenCalledOnce();
     expect(formatLearningStatusFromApi).not.toHaveBeenCalled();
-    expect(logs.join("\n")).toContain("[DB]");
+    expect(logs.join("\n")).toContain("[Qortex]");
   });
 
   it("falls back when only some API endpoints succeed", async () => {
@@ -95,7 +92,7 @@ describe("learning status CLI action", () => {
 
     console.log = origLog;
 
-    expect(formatLearningStatus).toHaveBeenCalledOnce();
+    expect(formatLearningStatusFromQortex).toHaveBeenCalledOnce();
     expect(formatLearningStatusFromApi).not.toHaveBeenCalled();
   });
 

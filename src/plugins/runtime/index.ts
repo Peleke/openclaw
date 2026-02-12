@@ -148,6 +148,7 @@ import {
 } from "../../line/send.js";
 import { monitorLineProvider } from "../../line/monitor.js";
 import { buildTemplateMessageFromPayload } from "../../line/template-messages.js";
+import { getSharedQortexConnection } from "../../qortex/connection.js";
 
 import type { PluginRuntime } from "./types.js";
 
@@ -194,6 +195,7 @@ export function createPluginRuntime(): PluginRuntime {
       createMemoryGetTool,
       createMemorySearchTool,
       registerMemoryCli,
+      getSharedQortexConnection,
     },
     channel: {
       text: {

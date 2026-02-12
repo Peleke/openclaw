@@ -1,13 +1,25 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 
-import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
-
 import { resolveAgentDir, resolveAgentWorkspaceDir } from "../../agents/agent-scope.js";
 import type { OpenClawConfig } from "../../config/config.js";
+import { createSubsystemLogger } from "../../logging/subsystem.js";
+import {
+  QortexMcpConnection,
+  parseCommandString,
+  parseToolResult as sharedParseToolResult,
+} from "../../qortex/connection.js";
+import type { QortexConnection } from "../../qortex/types.js";
+import { listMemoryFiles, buildFileEntry, hashText } from "../internal.js";
 import type { MemorySearchResult } from "../manager.js";
-import type { MemoryProvider, MemoryProviderStatus, SyncResult } from "./types.js";
+import type {
+  MemoryProvider,
+  MemoryProviderHooks,
+  MemoryProviderStatus,
+  SyncResult,
+} from "./types.js";
+
+const log = createSubsystemLogger("qortex-memory");
 
 // ── Config ──────────────────────────────────────────────────────────────────
 
@@ -24,22 +36,9 @@ const DEFAULT_ARGS = ["qortex", "mcp-serve"];
 const DEFAULT_TOP_K = 10;
 
 // Timeouts (ms)
-const INIT_TIMEOUT_MS = 15_000;
 const QUERY_TIMEOUT_MS = 30_000;
 const FEEDBACK_TIMEOUT_MS = 10_000;
-
-// Command validation: only allow known-safe binaries to spawn.
-const ALLOWED_COMMANDS = new Set(["uvx", "uv", "python", "python3", "qortex"]);
-
-function validateCommand(command: string): void {
-  const bin = path.basename(command);
-  if (!ALLOWED_COMMANDS.has(bin)) {
-    throw new Error(
-      `Refusing to spawn qortex: command not in allowlist. ` +
-        `Allowed: ${[...ALLOWED_COMMANDS].join(", ")}`,
-    );
-  }
-}
+const INGEST_TIMEOUT_MS = 60_000;
 
 // ── Result mapping (qortex QueryItem → MemorySearchResult) ─────────────────
 
@@ -66,28 +65,8 @@ type QortexQueryResponse = {
   }>;
 };
 
-type McpContent = Array<{ type: string; text?: string; [key: string]: unknown }>;
-
-/** @internal Exported for testing. */
-export function parseToolResult(result: Awaited<ReturnType<Client["callTool"]>>): unknown {
-  const content = result.content as McpContent | undefined;
-  if (result.isError) {
-    const msg =
-      content
-        ?.filter((c) => c.type === "text")
-        .map((c) => c.text ?? "")
-        .join("") || "unknown qortex error";
-    throw new Error(`qortex tool error: ${msg}`);
-  }
-  const textParts = content?.filter((c) => c.type === "text").map((c) => c.text ?? "");
-  const text = textParts?.join("") ?? "";
-  if (!text) return {};
-  try {
-    return JSON.parse(text);
-  } catch {
-    throw new Error(`qortex returned malformed JSON: ${text.slice(0, 200)}`);
-  }
-}
+/** @internal Exported for testing. Re-export from shared module. */
+export const parseToolResult = sharedParseToolResult;
 
 /** @internal Exported for testing. */
 export function mapQueryItems(response: QortexQueryResponse): MemorySearchResult[] {
@@ -107,44 +86,45 @@ export function mapQueryItems(response: QortexQueryResponse): MemorySearchResult
 // ── Provider ────────────────────────────────────────────────────────────────
 
 export class QortexMemoryProvider implements MemoryProvider {
-  private client: Client | null = null;
-  private transport: StdioClientTransport | null = null;
+  private ownedConnection: QortexConnection | null = null;
+  private sharedConnection: QortexConnection | null = null;
   private lastQueryId: string | null = null;
-  private connected = false;
+  /** Content hashes from last sync — skip re-ingest for unchanged files. */
+  private ingestedHashes = new Map<string, string>();
+  /** Whether we've ever synced (for onFirstSync hook). */
+  private hasSynced = false;
+  hooks: MemoryProviderHooks = {};
 
   constructor(
     private config: QortexProviderConfig,
     private agentId: string,
     private cfg: OpenClawConfig,
-  ) {}
+    /** Optional shared connection. If provided, init() is a no-op and close() won't close it. */
+    sharedConnection?: QortexConnection,
+  ) {
+    if (sharedConnection) {
+      this.sharedConnection = sharedConnection;
+    }
+  }
+
+  private get connection(): QortexConnection | null {
+    return this.sharedConnection ?? this.ownedConnection;
+  }
+
+  private get connected(): boolean {
+    return this.connection?.isConnected ?? false;
+  }
 
   /** Spawn the qortex MCP subprocess and perform the initialization handshake. */
   async init(): Promise<void> {
-    validateCommand(this.config.command);
+    // Skip if using shared connection (already initialized)
+    if (this.sharedConnection) return;
 
-    this.transport = new StdioClientTransport({
+    this.ownedConnection = new QortexMcpConnection({
       command: this.config.command,
       args: this.config.args,
-      stderr: "pipe",
     });
-
-    this.client = new Client({ name: "openclaw", version: "1.0.0" }, { capabilities: {} });
-
-    // Log server stderr for diagnostics (don't swallow it)
-    if (this.transport.stderr) {
-      this.transport.stderr.on("data", (chunk: Buffer) => {
-        process.stderr.write(`[qortex] ${String(chunk)}`);
-      });
-    }
-
-    await this.client.connect(this.transport, { timeout: INIT_TIMEOUT_MS });
-    this.connected = true;
-
-    // Register cleanup on parent exit
-    const cleanup = () => void this.close().catch(() => {});
-    process.once("exit", cleanup);
-    process.once("SIGTERM", cleanup);
-    process.once("SIGINT", cleanup);
+    await this.ownedConnection.init();
   }
 
   async search(
@@ -152,21 +132,17 @@ export class QortexMemoryProvider implements MemoryProvider {
     options?: { maxResults?: number; minScore?: number; sessionKey?: string },
   ): Promise<MemorySearchResult[]> {
     this.assertConnected();
-    const raw = await this.client!.callTool(
+    const response = (await this.connection!.callTool(
+      "qortex_query",
       {
-        name: "qortex_query",
-        arguments: {
-          context: query,
-          domains: this.config.domains,
-          top_k: options?.maxResults ?? this.config.topK,
-          min_confidence: options?.minScore ?? 0,
-          mode: "auto",
-        },
+        context: query,
+        domains: this.config.domains,
+        top_k: options?.maxResults ?? this.config.topK,
+        min_confidence: options?.minScore ?? 0,
+        mode: "auto",
       },
-      undefined,
       { timeout: QUERY_TIMEOUT_MS },
-    );
-    const response = parseToolResult(raw) as QortexQueryResponse;
+    )) as QortexQueryResponse;
     if (response.query_id) this.lastQueryId = response.query_id;
     return mapQueryItems(response);
   }
@@ -176,18 +152,16 @@ export class QortexMemoryProvider implements MemoryProvider {
     from?: number;
     lines?: number;
   }): Promise<{ text: string; path: string }> {
-    // qortex doesn't serve files — read locally, same as SQLite provider.
     const agentDir = resolveAgentDir(this.cfg, this.agentId);
     const workspaceDir = resolveAgentWorkspaceDir(this.cfg, this.agentId);
 
-    // Resolve candidate paths and validate they stay within expected dirs
+    // Try filesystem first
     const candidates = [
       { base: workspaceDir, resolved: path.resolve(workspaceDir, params.relPath) },
       { base: agentDir, resolved: path.resolve(agentDir, params.relPath) },
     ];
 
     for (const { base, resolved } of candidates) {
-      // Path traversal guard: resolved path must be under the base dir
       if (!resolved.startsWith(base + path.sep) && resolved !== base) continue;
       try {
         const raw = await fs.readFile(resolved, "utf8");
@@ -195,19 +169,92 @@ export class QortexMemoryProvider implements MemoryProvider {
         const start = params.from ?? 0;
         const end = params.lines ? start + params.lines : allLines.length;
         const text = allLines.slice(start, end).join("\n");
+
+        // Async: sync this file to DB if content changed
+        const hash = hashText(raw);
+        if (this.ingestedHashes.get(params.relPath) !== hash && this.connected) {
+          this.sync({ reason: `readFile:${params.relPath}` }).catch((err) =>
+            log.warn(`background sync after readFile failed: ${err}`),
+          );
+        }
+
         return { text, path: resolved };
       } catch {
         continue;
       }
     }
-    throw new Error(`File not found: ${params.relPath}`);
+
+    // File not found — fall back to DB via search
+    if (this.connected) {
+      try {
+        const results = await this.search(`file:${params.relPath}`, { maxResults: 1 });
+        if (results.length > 0 && results[0]!.snippet) {
+          log.info(`readFile: serving ${params.relPath} from DB (file not on disk)`);
+          return { text: results[0]!.snippet, path: params.relPath };
+        }
+      } catch (err) {
+        log.warn(`readFile: DB fallback failed for ${params.relPath}: ${err}`);
+      }
+    }
+
+    return { text: "", path: params.relPath };
   }
 
-  async sync(_params?: { reason?: string; force?: boolean }): Promise<SyncResult> {
+  async sync(params?: { reason?: string; force?: boolean }): Promise<SyncResult> {
     this.assertConnected();
-    // qortex_ingest takes a source_path + domain, not a bulk sync.
-    // For now, report no-op — real sync will be wired via Cadence events.
-    return { indexed: 0, skipped: 0, errors: [] };
+    const workspaceDir = resolveAgentWorkspaceDir(this.cfg, this.agentId);
+    const extraPaths = this.cfg.agents?.defaults?.memorySearch?.extraPaths;
+    const files = await listMemoryFiles(workspaceDir, extraPaths);
+
+    const result: SyncResult = { indexed: 0, skipped: 0, errors: [] };
+    const isFirst = !this.hasSynced && this.ingestedHashes.size === 0;
+    const domain = this.config.domains[0] ?? `memory/${this.agentId}`;
+
+    for (const absPath of files) {
+      try {
+        const entry = await buildFileEntry(absPath, workspaceDir);
+        const prevHash = this.ingestedHashes.get(entry.path);
+
+        // Skip unchanged files unless forced
+        if (!params?.force && prevHash === entry.hash) {
+          result.skipped++;
+          continue;
+        }
+
+        await this.connection!.callTool(
+          "qortex_ingest",
+          {
+            source_path: absPath,
+            domain,
+            source_type: "markdown",
+          },
+          { timeout: INGEST_TIMEOUT_MS },
+        );
+
+        const oldHash = prevHash;
+        this.ingestedHashes.set(entry.path, entry.hash);
+        result.indexed++;
+
+        if (oldHash && oldHash !== entry.hash) {
+          this.hooks.onVersionChange?.(entry.path, oldHash, entry.hash);
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        log.warn(`sync: failed to ingest ${absPath}: ${msg}`);
+        result.errors.push(msg);
+      }
+    }
+
+    this.hasSynced = true;
+    if (isFirst && result.indexed > 0) {
+      this.hooks.onFirstSync?.();
+    }
+    this.hooks.onSyncComplete?.(result);
+
+    log.info(
+      `sync: indexed=${result.indexed} skipped=${result.skipped} errors=${result.errors.length}`,
+    );
+    return result;
   }
 
   /** Send feedback on search results to improve future retrieval (Thompson Sampling). */
@@ -216,15 +263,11 @@ export class QortexMemoryProvider implements MemoryProvider {
     outcomes: Record<string, "accepted" | "rejected" | "partial">,
   ): Promise<void> {
     this.assertConnected();
-    const raw = await this.client!.callTool(
-      {
-        name: "qortex_feedback",
-        arguments: { query_id: queryId, outcomes, source: "openclaw" },
-      },
-      undefined,
+    await this.connection!.callTool(
+      "qortex_feedback",
+      { query_id: queryId, outcomes, source: "openclaw" },
       { timeout: FEEDBACK_TIMEOUT_MS },
     );
-    parseToolResult(raw); // validate response, throw on error
   }
 
   /** The query_id from the most recent search (for feedback). */
@@ -244,19 +287,15 @@ export class QortexMemoryProvider implements MemoryProvider {
   }
 
   async close(): Promise<void> {
-    if (!this.connected) return;
-    this.connected = false;
-    try {
-      await this.client?.close();
-    } catch {
-      // Best-effort cleanup — subprocess may already be dead
+    // Only close the connection we own, not a shared one
+    if (this.ownedConnection) {
+      await this.ownedConnection.close();
+      this.ownedConnection = null;
     }
-    this.client = null;
-    this.transport = null;
   }
 
   private assertConnected(): void {
-    if (!this.connected || !this.client) {
+    if (!this.connected || !this.connection) {
       throw new Error("QortexMemoryProvider not connected. Call init() first.");
     }
   }
@@ -269,10 +308,10 @@ export function resolveQortexConfig(
   agentId: string,
 ): QortexProviderConfig {
   const fullCommand = raw?.command ?? `${DEFAULT_COMMAND} ${DEFAULT_ARGS.join(" ")}`;
-  const parts = fullCommand.split(/\s+/);
+  const parsed = parseCommandString(fullCommand);
   return {
-    command: parts[0]!,
-    args: parts.slice(1),
+    command: parsed.command,
+    args: parsed.args,
     domains: raw?.domains ?? [`memory/${agentId}`],
     topK: raw?.topK ?? DEFAULT_TOP_K,
     feedback: raw?.feedback ?? true,

@@ -17,6 +17,19 @@ export type MemoryProviderStatus = {
 };
 
 /**
+ * Lifecycle hooks for memory providers.
+ * Extension points for the future Identity layer — consumers not built yet.
+ */
+export interface MemoryProviderHooks {
+  /** DB was empty and first content was indexed (onboarding signal). */
+  onFirstSync?: () => void;
+  /** A file's content hash changed between syncs. */
+  onVersionChange?: (path: string, oldHash: string, newHash: string) => void;
+  /** Sync completed (success or partial). */
+  onSyncComplete?: (result: SyncResult) => void;
+}
+
+/**
  * Common interface for memory search backends.
  *
  * SQLite (existing) and qortex (new) both implement this.

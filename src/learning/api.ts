@@ -1,21 +1,13 @@
 /**
  * Learning layer JSON API handler for the gateway HTTP chain.
  * Prefix: /__openclaw__/api/learning/
+ *
+ * Sources data from qortex learning MCP tools instead of local SQLite.
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import type { DatabaseSync } from "node:sqlite";
 import type { LearningConfig } from "./types.js";
-import {
-  getTraceSummary,
-  listRunTracesWithOffset,
-  loadPosteriors,
-  getTokenTimeseries,
-  getConvergenceTimeseries,
-  getBaselineComparison,
-} from "./store.js";
-import { betaCredibleInterval } from "./beta.js";
-import { SEED_ARM_IDS } from "./strategy.js";
+import type { QortexLearningClient } from "./qortex-client.js";
 
 const PREFIX = "/__openclaw__/api/learning/";
 
@@ -34,16 +26,11 @@ function parseUrl(req: IncomingMessage): URL | null {
   }
 }
 
-const WINDOW_MAP: Record<string, number> = {
-  "1h": 3_600_000,
-  "1d": 86_400_000,
-};
-
 export function createLearningApiHandler(opts: {
-  getDb: () => DatabaseSync | null;
+  getClient: () => QortexLearningClient | null;
   getConfig?: () => LearningConfig | null;
 }): (req: IncomingMessage, res: ServerResponse) => Promise<boolean> {
-  const { getDb, getConfig } = opts;
+  const { getClient, getConfig } = opts;
 
   return async (req, res) => {
     const url = parseUrl(req);
@@ -51,7 +38,7 @@ export function createLearningApiHandler(opts: {
 
     const route = url.pathname.slice(PREFIX.length).replace(/\/+$/, "");
 
-    // Dashboard serves HTML on-the-fly — no DB needed, no filesystem writes.
+    // Dashboard serves HTML on-the-fly — no qortex needed.
     if (route === "dashboard") {
       if (req.method !== "GET") {
         res.statusCode = 405;
@@ -68,9 +55,9 @@ export function createLearningApiHandler(opts: {
       return true;
     }
 
-    const db = getDb();
-    if (!db) {
-      sendJson(res, 503, { error: "Learning DB not available" });
+    const client = getClient();
+    if (!client || !client.isAvailable) {
+      sendJson(res, 503, { error: "Learning backend (qortex) not available" });
       return true;
     }
 
@@ -81,12 +68,31 @@ export function createLearningApiHandler(opts: {
       return true;
     }
 
-    if (route === "summary") {
-      const summary = getTraceSummary(db);
-      const baseline = getBaselineComparison(db);
+    if (route === "summary" || route === "metrics") {
+      const metrics = await client.metrics();
+      if (!metrics) {
+        sendJson(res, 503, { error: "Failed to fetch metrics from qortex" });
+        return true;
+      }
+      // Map qortex metrics to dashboard-compatible shape
       sendJson(res, 200, {
-        ...summary,
-        baseline,
+        traceCount: metrics.total_pulls,
+        armCount: metrics.arm_count,
+        totalTokens: 0,
+        accuracy: metrics.accuracy,
+        exploreRatio: metrics.explore_ratio,
+        totalReward: metrics.total_reward,
+        minTimestamp: null,
+        maxTimestamp: null,
+        baseline: {
+          baselineRuns: 0,
+          selectedRuns: metrics.total_pulls,
+          baselineAvgTokens: null,
+          selectedAvgTokens: null,
+          tokenSavingsPercent: null,
+          baselineAvgDuration: null,
+          selectedAvgDuration: null,
+        },
       });
       return true;
     }
@@ -96,63 +102,52 @@ export function createLearningApiHandler(opts: {
       sendJson(res, 200, {
         enabled: config?.enabled ?? false,
         phase: config?.phase ?? "passive",
-        strategy: config?.strategy ?? "thompson",
         tokenBudget: config?.tokenBudget ?? 8000,
         baselineRate: config?.baselineRate ?? 0.1,
         minPulls: config?.minPulls ?? 5,
-        seedArmIds: SEED_ARM_IDS,
+        backend: "qortex",
       });
       return true;
     }
 
     if (route === "posteriors") {
-      const map = loadPosteriors(db);
-      const config = getConfig?.() ?? null;
-      const minPulls = config?.minPulls ?? 5;
-      const seedSet = new Set(SEED_ARM_IDS);
-
-      const arr = Array.from(map.values())
-        .map((p) => {
-          const credible = betaCredibleInterval({ alpha: p.alpha, beta: p.beta });
-          return {
-            armId: p.armId,
-            alpha: p.alpha,
-            beta: p.beta,
-            mean: p.alpha / (p.alpha + p.beta),
-            pulls: p.pulls,
-            lastUpdated: p.lastUpdated,
-            // Thompson context
-            isSeed: seedSet.has(p.armId),
-            isUnderexplored: p.pulls < minPulls,
-            credibleInterval: {
-              lower: credible.lower,
-              upper: credible.upper,
-            },
-            confidence: p.pulls < 5 ? "low" : p.pulls < 20 ? "medium" : "high",
-          };
-        })
+      const result = await client.posteriors();
+      if (!result) {
+        sendJson(res, 503, { error: "Failed to fetch posteriors from qortex" });
+        return true;
+      }
+      // Convert qortex posteriors map to dashboard-expected array
+      const minPulls = getConfig?.()?.minPulls ?? 5;
+      const arr = Object.entries(result.posteriors)
+        .map(([armId, state]) => ({
+          armId,
+          alpha: state.alpha,
+          beta: state.beta,
+          mean: state.mean,
+          pulls: state.pulls,
+          lastUpdated: state.last_updated,
+          confidence: state.pulls < 5 ? "low" : state.pulls < 20 ? "medium" : "high",
+          isSeed: false,
+          isUnderexplored: state.pulls < minPulls,
+        }))
         .sort((a, b) => b.mean - a.mean);
       sendJson(res, 200, arr);
       return true;
     }
 
     if (route === "traces") {
-      const limit = Math.min(Number(url.searchParams.get("limit") ?? 100), 1000);
-      const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
-      sendJson(res, 200, listRunTracesWithOffset(db, { limit, offset }));
+      // Time-series data not yet available from qortex MCP — return placeholder
+      sendJson(res, 200, {
+        traces: [],
+        total: 0,
+        note: "Traces sourced from qortex observability layer",
+      });
       return true;
     }
 
     if (route === "timeseries") {
-      const metric = url.searchParams.get("metric") ?? "tokens";
-      const windowKey = url.searchParams.get("window") ?? "1h";
-      const windowMs = WINDOW_MAP[windowKey] ?? 3_600_000;
-
-      if (metric === "convergence") {
-        sendJson(res, 200, { buckets: getConvergenceTimeseries(db, windowMs) });
-      } else {
-        sendJson(res, 200, { buckets: getTokenTimeseries(db, windowMs) });
-      }
+      // Time-series not yet available from qortex MCP — return empty buckets
+      sendJson(res, 200, { buckets: [], note: "Awaiting qortex timeseries MCP tool" });
       return true;
     }
 
