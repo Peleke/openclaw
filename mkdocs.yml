@@ -60,3 +60,12 @@ nav:
     - Reference:
       - Types: learning/reference/types.md
       - Exports: learning/reference/exports.md
+  - Cadence:
+    - Overview: cadence/index.md
+    - Getting Started:
+      - Quick Start: cadence/getting-started/quick-start.md
+      - Core Concepts: cadence/getting-started/concepts.md
+    - Guides:
+      - Configuration: cadence/guides/configuration.md
+    - Reference:
+      - Signals: cadence/reference/signals.md

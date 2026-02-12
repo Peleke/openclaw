@@ -32,6 +32,13 @@ This fork adds **observability layers** that make your AI usage accountable, mea
 <p><a href="learning/" style="color: #58a6ff;">Docs &rarr;</a></p>
 </div>
 
+<div style="border: 1px solid #FF6B35; border-radius: 8px; padding: 1.2em; background: #0d1117; color: #c9d1d9;">
+<h3 style="color: #FF6B35; margin-top: 0;">Cadence</h3>
+<p>Ambient intelligence via typed signals, sources, and responders. The gateway reacts to events (vault edits, cron ticks, state transitions) without being asked.</p>
+<p><strong>Status:</strong> Shipped (core bus + P1 responders)</p>
+<p><a href="cadence/" style="color: #58a6ff;">Docs &rarr;</a></p>
+</div>
+
 </div>
 
 ## Why a fork?
@@ -60,6 +67,9 @@ Green and Learning run as **always-on, zero-config layers** inside the gateway. 
 | Learning API reference | [REST endpoints](learning/guides/api-reference.md) |
 | Learning dashboard | [Thompson Sampling visualizations](learning/guides/dashboard.md) |
 | Thompson Sampling theory | [How the bandit works](learning/theory/thompson-sampling.md) |
+| Cadence overview | [Signals, sources, responders](cadence/index.md) |
+| Cadence quick start | [Wire your first responder](cadence/getting-started/quick-start.md) |
+| Cadence signal reference | [All signal types](cadence/reference/signals.md) |
 | Source | [github.com/Peleke/openclaw](https://github.com/Peleke/openclaw) |
 
 ---
