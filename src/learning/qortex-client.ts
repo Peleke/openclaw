@@ -144,6 +144,8 @@ export class QortexLearningClient {
       token_budget?: number;
       /** Number of arms to select (default: all within budget). */
       k?: number;
+      /** Arms with fewer than N pulls are always included (exploration floor). */
+      min_pulls?: number;
     },
   ): Promise<QortexSelectResult> {
     if (!this.isAvailable) {
@@ -162,6 +164,7 @@ export class QortexLearningClient {
           context: opts?.context ?? null,
           k: opts?.k ?? 0, // 0 = select as many as budget allows
           token_budget: opts?.token_budget ?? 0,
+          min_pulls: opts?.min_pulls ?? 0,
         },
         { timeout: SELECT_TIMEOUT_MS },
       )) as QortexSelectResult;

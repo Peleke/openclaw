@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { QortexLearningClient } from "./qortex-client.js";
 import type { QortexMcpConnection } from "../qortex/connection.js";
 
@@ -66,6 +66,7 @@ describe("QortexLearningClient", () => {
           context: { channel: "slack" },
           k: 2,
           token_budget: 5000,
+          min_pulls: 0,
         },
         { timeout: expect.any(Number) },
       );
@@ -94,7 +95,33 @@ describe("QortexLearningClient", () => {
           context: null,
           k: 0,
           token_budget: 0,
+          min_pulls: 0,
         }),
+        expect.any(Object),
+      );
+    });
+
+    it("forwards min_pulls to qortex_learning_select", async () => {
+      const conn = mockConnection({
+        callTool: vi.fn(async () => ({
+          selected_arms: ["a"],
+          excluded_arms: [],
+          is_baseline: false,
+          scores: {},
+          token_budget: 5000,
+          used_tokens: 100,
+        })),
+      });
+      const client = new QortexLearningClient(conn, "test-learner");
+
+      await client.select([{ id: "a", token_cost: 100 }], {
+        token_budget: 5000,
+        min_pulls: 3,
+      });
+
+      expect(conn.callTool).toHaveBeenCalledWith(
+        "qortex_learning_select",
+        expect.objectContaining({ min_pulls: 3 }),
         expect.any(Object),
       );
     });

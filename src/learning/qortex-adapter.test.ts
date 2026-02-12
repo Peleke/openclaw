@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import {
   buildCandidates,
   selectViaQortex,
@@ -248,6 +248,58 @@ describe("selectViaQortex()", () => {
           session_key: "abc",
         }),
       }),
+    );
+  });
+
+  it("forwards minPulls from config to client.select()", async () => {
+    const selectFn = vi.fn(async () => ({
+      selected_arms: [],
+      excluded_arms: [],
+      is_baseline: true,
+      scores: {},
+      token_budget: 8000,
+      used_tokens: 0,
+    }));
+    const client = mockClient({ select: selectFn });
+
+    await selectViaQortex({
+      client,
+      config: { ...baseConfig, minPulls: 5 },
+      tools: [makeTool("bash")],
+      skillEntries: [],
+      contextFiles: [],
+      context: {},
+    });
+
+    expect(selectFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ min_pulls: 5 }),
+    );
+  });
+
+  it("passes undefined min_pulls when config has no minPulls", async () => {
+    const selectFn = vi.fn(async () => ({
+      selected_arms: [],
+      excluded_arms: [],
+      is_baseline: true,
+      scores: {},
+      token_budget: 8000,
+      used_tokens: 0,
+    }));
+    const client = mockClient({ select: selectFn });
+
+    await selectViaQortex({
+      client,
+      config: { enabled: true, phase: "active", tokenBudget: 8000 },
+      tools: [],
+      skillEntries: [],
+      contextFiles: [],
+      context: {},
+    });
+
+    expect(selectFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ min_pulls: undefined }),
     );
   });
 

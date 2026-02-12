@@ -109,6 +109,7 @@ export async function selectViaQortex(params: {
   const result = await client.select(candidates, {
     token_budget: tokenBudget,
     context: qortexContext,
+    min_pulls: config.minPulls,
   });
 
   if (!result) {

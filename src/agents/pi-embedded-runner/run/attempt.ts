@@ -63,6 +63,7 @@ import { buildEmbeddedExtensionPaths } from "../extensions.js";
 import { applyExtraParamsToAgent } from "../extra-params.js";
 import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
 import { selectViaQortex, type AdapterSelectionResult } from "../../../learning/qortex-adapter.js";
+import { buildExcludedToolsGuidance } from "../../../learning/excluded-tools-guidance.js";
 import { QortexLearningClient } from "../../../learning/qortex-client.js";
 import { QortexMcpConnection, parseCommandString } from "../../../qortex/connection.js";
 import type { QortexConnection } from "../../../qortex/types.js";
@@ -295,6 +296,11 @@ export async function runEmbeddedAttempt(
     // Apply learning selection to filter tools (if active)
     const effectiveToolsRaw = learningSelection?.selectedTools ?? toolsRaw;
 
+    // Build excluded-tools guidance so the model can explain unavailable capabilities
+    const excludedToolsGuidance = buildExcludedToolsGuidance(
+      learningSelection?.selection.excludedArms,
+    );
+
     const tools = sanitizeToolsForGoogle({ tools: effectiveToolsRaw, provider: params.provider });
     logToolSchemasForGoogle({ tools, provider: params.provider });
 
@@ -400,7 +406,11 @@ export async function runEmbeddedAttempt(
       workspaceDir: effectiveWorkspace,
       defaultThinkLevel: params.thinkLevel,
       reasoningLevel: params.reasoningLevel ?? "off",
-      extraSystemPrompt: params.extraSystemPrompt,
+      extraSystemPrompt: excludedToolsGuidance
+        ? params.extraSystemPrompt
+          ? `${params.extraSystemPrompt}\n\n${excludedToolsGuidance}`
+          : excludedToolsGuidance
+        : params.extraSystemPrompt,
       ownerNumbers: params.ownerNumbers,
       reasoningTagHint,
       heartbeatPrompt: isDefaultAgent
