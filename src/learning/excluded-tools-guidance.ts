@@ -21,6 +21,7 @@ export function buildExcludedToolsGuidance(excludedArms?: string[]): string | nu
     const parsed = parseArmId(armId);
     if (parsed?.type === "tool") {
       // Sanitize: strip control chars and limit length to prevent prompt injection
+      // oxlint-ignore-next-line no-control-regex -- intentional control char stripping
       const safe = parsed.id.replace(/[\x00-\x1f]/g, "").slice(0, 64);
       if (safe) excludedToolNames.push(safe);
     }
