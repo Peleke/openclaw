@@ -694,7 +694,7 @@ export async function runEmbeddedPiAgent(
                 if (ownsConn) await conn.close();
               }
             } catch (err) {
-              log.debug(`learning: post-run observation failed: ${String(err)}`);
+              log.warn(`learning: post-run observation failed: ${String(err)}`);
             }
           }
 

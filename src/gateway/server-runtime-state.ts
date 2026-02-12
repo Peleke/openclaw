@@ -119,11 +119,15 @@ export async function createGatewayRuntimeState(params: {
     try {
       await sharedConn.init();
       setSharedQortexConnection(sharedConn);
+      const learningCfgStatus = learningCfg?.enabled
+        ? `learning: active, phase=${learningCfg.phase ?? "unknown"}, learner=${learningCfg.learnerName ?? "openclaw"}`
+        : "learning: disabled";
+      params.log.info(`qortex shared connection ready (${learningCfgStatus})`);
     } catch (err) {
       params.log.warn(`qortex shared connection failed to init: ${String(err)}`);
     }
-  } catch {
-    // Qortex module not available; skip
+  } catch (err) {
+    params.log.info(`qortex module not available, skipping shared connection: ${String(err)}`);
   }
 
   // Learning API — uses the shared qortex connection
