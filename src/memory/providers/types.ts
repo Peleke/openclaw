@@ -16,6 +16,24 @@ export type MemoryProviderStatus = {
   details?: Record<string, unknown>;
 };
 
+/** A rule/pattern extracted by the knowledge graph, relevant to a query. */
+export type MemoryRule = {
+  id: string;
+  text: string;
+  domain: string;
+  confidence: number;
+  relevance: number;
+};
+
+/** Response from a memory search — results + optional query-level metadata. */
+export type MemorySearchResponse = {
+  results: MemorySearchResult[];
+  /** Extracted rules/patterns relevant to the query (qortex only). */
+  rules?: MemoryRule[];
+  /** Query ID for feedback (qortex only). */
+  queryId?: string;
+};
+
 /**
  * Lifecycle hooks for memory providers.
  * Extension points for the future Identity layer — consumers not built yet.
@@ -33,7 +51,7 @@ export interface MemoryProviderHooks {
  * Common interface for memory search backends.
  *
  * SQLite (existing) and qortex (new) both implement this.
- * Tools (`memory_search`, `memory_get`) depend only on this contract.
+ * Tools (`memory_search`, `memory_get`, `memory_feedback`) depend only on this contract.
  */
 export interface MemoryProvider {
   /** Semantically search indexed memory. */
@@ -44,7 +62,7 @@ export interface MemoryProvider {
       minScore?: number;
       sessionKey?: string;
     },
-  ): Promise<MemorySearchResult[]>;
+  ): Promise<MemorySearchResponse>;
 
   /** Read a snippet from a memory/session file. */
   readFile(params: {
@@ -55,6 +73,12 @@ export interface MemoryProvider {
 
   /** Re-index sources (files, sessions, etc.). */
   sync(params?: { reason?: string; force?: boolean }): Promise<SyncResult>;
+
+  /** Send feedback on search results to improve retrieval (optional — qortex only). */
+  feedback?(
+    queryId: string,
+    outcomes: Record<string, "accepted" | "rejected" | "partial">,
+  ): Promise<void>;
 
   /** Current provider status for diagnostics/tool output. */
   status(): MemoryProviderStatus;

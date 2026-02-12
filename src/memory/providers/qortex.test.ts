@@ -4,7 +4,7 @@ import {
   resolveQortexConfig,
   QortexMemoryProvider,
   parseToolResult,
-  mapQueryItems,
+  mapQueryResponse,
 } from "./qortex.js";
 
 // ── resolveQortexConfig ─────────────────────────────────────────────────────
@@ -131,10 +131,10 @@ describe("parseToolResult", () => {
   });
 });
 
-// ── mapQueryItems ───────────────────────────────────────────────────────────
+// ── mapQueryResponse ────────────────────────────────────────────────────────
 
-describe("mapQueryItems", () => {
-  it("maps qortex items to MemorySearchResult", () => {
+describe("mapQueryResponse", () => {
+  it("maps qortex items to MemorySearchResult and preserves queryId", () => {
     const response = {
       items: [
         {
@@ -148,7 +148,7 @@ describe("mapQueryItems", () => {
       ],
       query_id: "q1",
     };
-    const results = mapQueryItems(response);
+    const { results, queryId } = mapQueryResponse(response);
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual({
       path: "memory/test.md",
@@ -158,6 +158,7 @@ describe("mapQueryItems", () => {
       snippet: "hello world",
       source: "memory",
     });
+    expect(queryId).toBe("q1");
   });
 
   it("maps session source correctly", () => {
@@ -174,8 +175,33 @@ describe("mapQueryItems", () => {
       ],
       query_id: "q2",
     };
-    const results = mapQueryItems(response);
+    const { results } = mapQueryResponse(response);
     expect(results[0]!.source).toBe("sessions");
+  });
+
+  it("maps rules when present", () => {
+    const response = {
+      items: [],
+      query_id: "q4",
+      rules: [
+        {
+          id: "r1",
+          text: "always greet warmly",
+          domain: "memory/test",
+          confidence: 0.9,
+          relevance: 0.85,
+        },
+      ],
+    };
+    const { rules } = mapQueryResponse(response);
+    expect(rules).toHaveLength(1);
+    expect(rules![0]).toEqual({
+      id: "r1",
+      text: "always greet warmly",
+      domain: "memory/test",
+      confidence: 0.9,
+      relevance: 0.85,
+    });
   });
 
   it("uses defaults for missing metadata fields", () => {
@@ -183,16 +209,16 @@ describe("mapQueryItems", () => {
       items: [{ id: "c3", content: "bare", score: 0.5, domain: "d", node_id: "n3", metadata: {} }],
       query_id: "q3",
     };
-    const results = mapQueryItems(response);
+    const { results } = mapQueryResponse(response);
     expect(results[0]!.path).toBe("<qortex:d>");
     expect(results[0]!.startLine).toBe(0);
     expect(results[0]!.endLine).toBe(0);
     expect(results[0]!.source).toBe("memory");
   });
 
-  it("returns empty array for non-array items", () => {
-    expect(mapQueryItems({ items: null, query_id: "q" } as any)).toEqual([]);
-    expect(mapQueryItems({ query_id: "q" } as any)).toEqual([]);
+  it("returns empty results for non-array items", () => {
+    expect(mapQueryResponse({ items: null, query_id: "q" } as any).results).toEqual([]);
+    expect(mapQueryResponse({ query_id: "q" } as any).results).toEqual([]);
   });
 });
 
@@ -234,14 +260,14 @@ describe("QortexMemoryProvider guards", () => {
 // ── readFile path traversal guard ───────────────────────────────────────────
 
 describe("QortexMemoryProvider.readFile path traversal", () => {
-  it("rejects path traversal attempts", async () => {
+  it("returns empty text for path traversal attempts (not connected, no DB fallback)", async () => {
     const cfg = resolveQortexConfig(undefined, "test");
     const provider = new QortexMemoryProvider(cfg, "test", {
       agents: { list: [{ id: "test", default: true }] },
     } as any);
-    await expect(provider.readFile({ relPath: "../../../etc/passwd" })).rejects.toThrow(
-      "File not found",
-    );
+    const result = await provider.readFile({ relPath: "../../../etc/passwd" });
+    expect(result.text).toBe("");
+    expect(result.path).toBe("../../../etc/passwd");
   });
 });
 
@@ -249,18 +275,16 @@ describe("QortexMemoryProvider.readFile path traversal", () => {
 
 describe("SqliteMemoryProvider", () => {
   const makeMockManager = () => ({
-    search: vi
-      .fn()
-      .mockResolvedValue([
-        {
-          path: "memory/test.md",
-          startLine: 1,
-          endLine: 5,
-          score: 0.9,
-          snippet: "hello",
-          source: "memory",
-        },
-      ]),
+    search: vi.fn().mockResolvedValue([
+      {
+        path: "memory/test.md",
+        startLine: 1,
+        endLine: 5,
+        score: 0.9,
+        snippet: "hello",
+        source: "memory",
+      },
+    ]),
     readFile: vi.fn().mockResolvedValue({ text: "content", path: "/tmp/test.md" }),
     sync: vi.fn().mockResolvedValue(undefined),
     status: vi.fn().mockReturnValue({
@@ -272,11 +296,11 @@ describe("SqliteMemoryProvider", () => {
     close: vi.fn().mockResolvedValue(undefined),
   });
 
-  it("delegates search to manager", async () => {
+  it("delegates search to manager and wraps in response", async () => {
     const { SqliteMemoryProvider } = await import("./sqlite.js");
     const mock = makeMockManager();
     const provider = new SqliteMemoryProvider(mock as any);
-    const results = await provider.search("hello", { maxResults: 5 });
+    const { results } = await provider.search("hello", { maxResults: 5 });
     expect(results).toHaveLength(1);
     expect(results[0]!.snippet).toBe("hello");
     expect(mock.search).toHaveBeenCalledWith("hello", { maxResults: 5 });

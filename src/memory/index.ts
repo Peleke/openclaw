@@ -5,5 +5,7 @@ export {
   type MemoryProvider,
   type MemoryProviderResult,
   type MemoryProviderStatus,
+  type MemoryRule,
+  type MemorySearchResponse,
   type SyncResult,
 } from "./providers/index.js";

@@ -193,8 +193,7 @@ async function phase1(provider: QortexMemoryProvider): Promise<string[]> {
   // Search x 10
   const queryIds: string[] = [];
   for (let i = 0; i < SEARCH_QUERIES.length; i++) {
-    const results = await provider.search(SEARCH_QUERIES[i]!, { maxResults: 5 });
-    const qid = provider.currentQueryId;
+    const { results, queryId: qid } = await provider.search(SEARCH_QUERIES[i]!, { maxResults: 5 });
     check(`memory.search[${i}]`, Array.isArray(results), `${results.length} results, qid=${qid}`);
     if (qid) queryIds.push(qid);
     if (results.length > 0) hadSearchResults = true;
@@ -514,6 +513,10 @@ async function main() {
   const learningClient = new QortexLearningClient(connection, "openclaw-dogfood");
 
   try {
+    // Sync memory files before searching — avoid race with empty DB
+    const syncResult = await memProvider.sync({ reason: "dogfood-init" });
+    check("memory.sync", syncResult.errors.length === 0, `indexed=${syncResult.indexed} skipped=${syncResult.skipped}`);
+
     await phase1(memProvider);
     await phase2(learningClient);
 
