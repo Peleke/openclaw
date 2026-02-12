@@ -45,10 +45,12 @@ export async function createMemoryProvider(
       const qortexCfg = resolveQortexConfig(resolved.qortex, agentId);
       const provider = new QortexMemoryProvider(qortexCfg, agentId, cfg, opts?.qortexConnection);
       await provider.init();
-      // Kick off initial sync in background — populates the DB from memory files
-      provider
-        .sync({ reason: "init" })
-        .catch((err) => log.warn(`background sync on init failed: ${err}`));
+      // Await initial sync so the first search has data (not fire-and-forget)
+      try {
+        await provider.sync({ reason: "init" });
+      } catch (err) {
+        log.warn(`sync on init failed: ${err}`);
+      }
       return { provider };
     }
 

@@ -513,6 +513,10 @@ async function main() {
   const learningClient = new QortexLearningClient(connection, "openclaw-dogfood");
 
   try {
+    // Sync memory files before searching — avoid race with empty DB
+    const syncResult = await memProvider.sync({ reason: "dogfood-init" });
+    check("memory.sync", syncResult.errors.length === 0, `indexed=${syncResult.indexed} skipped=${syncResult.skipped}`);
+
     await phase1(memProvider);
     await phase2(learningClient);
 
