@@ -95,4 +95,6 @@ export type RunEmbeddedPiAgentParams = {
   streamParams?: AgentStreamParams;
   ownerNumbers?: string[];
   enforceFinalTag?: boolean;
+  /** Shared qortex MCP connection for memory + learning (avoids per-request subprocess spawn). */
+  qortexConnection?: import("../../../qortex/types.js").QortexConnection;
 };

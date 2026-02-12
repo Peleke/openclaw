@@ -1,5 +1,11 @@
-import { describe, it, expect } from "vitest";
-import { parseToolResult, parseCommandString } from "./connection.js";
+import { describe, it, expect, beforeEach } from "vitest";
+import {
+  parseToolResult,
+  parseCommandString,
+  getSharedQortexConnection,
+  setSharedQortexConnection,
+} from "./connection.js";
+import type { QortexConnection } from "./types.js";
 
 describe("parseToolResult()", () => {
   it("parses JSON text content", () => {
@@ -101,5 +107,45 @@ describe("parseCommandString()", () => {
       command: "python3",
       args: ["-m", "qortex.mcp", "serve", "--port", "8080"],
     });
+  });
+});
+
+describe("shared qortex connection singleton", () => {
+  beforeEach(() => {
+    // Reset to undefined between tests
+    setSharedQortexConnection(undefined as unknown as QortexConnection);
+  });
+
+  it("returns undefined when no connection has been set", () => {
+    expect(getSharedQortexConnection()).toBeUndefined();
+  });
+
+  it("returns the connection after set", () => {
+    const mock: QortexConnection = {
+      isConnected: true,
+      init: async () => {},
+      callTool: async () => ({}),
+      close: async () => {},
+    };
+    setSharedQortexConnection(mock);
+    expect(getSharedQortexConnection()).toBe(mock);
+  });
+
+  it("replaces a previously set connection", () => {
+    const first: QortexConnection = {
+      isConnected: false,
+      init: async () => {},
+      callTool: async () => ({}),
+      close: async () => {},
+    };
+    const second: QortexConnection = {
+      isConnected: true,
+      init: async () => {},
+      callTool: async () => ({}),
+      close: async () => {},
+    };
+    setSharedQortexConnection(first);
+    setSharedQortexConnection(second);
+    expect(getSharedQortexConnection()).toBe(second);
   });
 });

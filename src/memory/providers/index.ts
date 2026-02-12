@@ -24,6 +24,10 @@ export type MemoryProviderResult = {
 export async function createMemoryProvider(
   cfg: OpenClawConfig,
   agentId: string,
+  opts?: {
+    /** Shared qortex connection — avoids spawning a per-request subprocess. */
+    qortexConnection?: import("../../qortex/types.js").QortexConnection;
+  },
 ): Promise<MemoryProviderResult> {
   try {
     const { resolveMemorySearchConfig } = await import("../../agents/memory-search.js");
@@ -33,7 +37,7 @@ export async function createMemoryProvider(
     if (resolved.provider === "qortex") {
       const { QortexMemoryProvider, resolveQortexConfig } = await import("./qortex.js");
       const qortexCfg = resolveQortexConfig(resolved.qortex, agentId);
-      const provider = new QortexMemoryProvider(qortexCfg, agentId, cfg);
+      const provider = new QortexMemoryProvider(qortexCfg, agentId, cfg, opts?.qortexConnection);
       await provider.init();
       return { provider };
     }

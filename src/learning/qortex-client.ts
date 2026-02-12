@@ -14,7 +14,7 @@
  *   qortex-track-c/src/qortex/learning/types.py
  */
 
-import type { QortexMcpConnection } from "../qortex/connection.js";
+import type { QortexConnection } from "../qortex/types.js";
 import { log } from "./logger.js";
 
 // Timeouts (ms)
@@ -111,7 +111,7 @@ export type QortexSessionEndResult = {
 
 export class QortexLearningClient {
   constructor(
-    private readonly connection: QortexMcpConnection,
+    private readonly connection: QortexConnection,
     private readonly learnerName: string = "openclaw",
   ) {}
 

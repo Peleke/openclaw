@@ -65,6 +65,7 @@ import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-tt
 import { selectViaQortex, type AdapterSelectionResult } from "../../../learning/qortex-adapter.js";
 import { QortexLearningClient } from "../../../learning/qortex-client.js";
 import { QortexMcpConnection, parseCommandString } from "../../../qortex/connection.js";
+import type { QortexConnection } from "../../../qortex/types.js";
 import {
   logToolSchemasForGoogle,
   sanitizeSessionHistory,
@@ -246,11 +247,20 @@ export async function runEmbeddedAttempt(
     if (params.config?.learning?.phase === "active" && params.config?.learning?.enabled) {
       try {
         const learningCfg = params.config.learning;
-        const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
-        const connConfig = parseCommandString(qortexCmd);
-        const conn = new QortexMcpConnection(connConfig);
-        try {
+        // Prefer shared connection (singleton, kept alive by gateway); fall back to one-shot.
+        const shared = params.qortexConnection;
+        let conn: QortexConnection;
+        let ownsConn: boolean;
+        if (shared?.isConnected) {
+          conn = shared;
+          ownsConn = false;
+        } else {
+          const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
+          conn = new QortexMcpConnection(parseCommandString(qortexCmd));
           await conn.init();
+          ownsConn = true;
+        }
+        try {
           const client = new QortexLearningClient(conn, learningCfg.learnerName);
           const runtimeChannel = normalizeMessageChannel(
             params.messageChannel ?? params.messageProvider,
@@ -275,7 +285,7 @@ export async function runEmbeddedAttempt(
             },
           });
         } finally {
-          await conn.close();
+          if (ownsConn) await conn.close();
         }
       } catch (err) {
         log.debug(`learning: pre-run selection failed: ${String(err)}`);

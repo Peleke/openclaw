@@ -32,6 +32,8 @@ const MemoryFeedbackSchema = Type.Object({
 export function createMemorySearchTool(options: {
   config?: OpenClawConfig;
   agentSessionKey?: string;
+  /** Shared qortex connection — avoids per-request subprocess spawn. */
+  qortexConnection?: import("../../qortex/types.js").QortexConnection;
 }): AnyAgentTool | null {
   const cfg = options.config;
   if (!cfg) {
@@ -62,6 +64,7 @@ export function createMemorySearchTool(options: {
       const { provider, error } = await getMemoryProvider({
         cfg,
         agentId,
+        qortexConnection: options.qortexConnection,
       });
       if (!provider) {
         return jsonResult({ results: [], disabled: true, error });
@@ -90,6 +93,7 @@ export function createMemorySearchTool(options: {
 export function createMemoryGetTool(options: {
   config?: OpenClawConfig;
   agentSessionKey?: string;
+  qortexConnection?: import("../../qortex/types.js").QortexConnection;
 }): AnyAgentTool | null {
   const cfg = options.config;
   if (!cfg) return null;
@@ -111,6 +115,7 @@ export function createMemoryGetTool(options: {
       const { provider, error } = await getMemoryProvider({
         cfg,
         agentId,
+        qortexConnection: options.qortexConnection,
       });
       if (!provider) {
         return jsonResult({ path: relPath, text: "", disabled: true, error });
@@ -137,6 +142,7 @@ export function createMemoryGetTool(options: {
 export function createMemoryFeedbackTool(options: {
   config?: OpenClawConfig;
   agentSessionKey?: string;
+  qortexConnection?: import("../../qortex/types.js").QortexConnection;
 }): AnyAgentTool | null {
   const cfg = options.config;
   if (!cfg) return null;
@@ -162,7 +168,11 @@ export function createMemoryFeedbackTool(options: {
           error: 'outcome must be "accepted", "rejected", or "partial"',
         });
       }
-      const { provider, error } = await getMemoryProvider({ cfg, agentId });
+      const { provider, error } = await getMemoryProvider({
+        cfg,
+        agentId,
+        qortexConnection: options.qortexConnection,
+      });
       if (!provider) {
         return jsonResult({ ok: false, error });
       }

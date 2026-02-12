@@ -8,6 +8,7 @@ import {
   parseCommandString,
   parseToolResult as sharedParseToolResult,
 } from "../../qortex/connection.js";
+import type { QortexConnection } from "../../qortex/types.js";
 import type { MemorySearchResult } from "../manager.js";
 import type { MemoryProvider, MemoryProviderStatus, SyncResult } from "./types.js";
 
@@ -75,8 +76,8 @@ export function mapQueryItems(response: QortexQueryResponse): MemorySearchResult
 // ── Provider ────────────────────────────────────────────────────────────────
 
 export class QortexMemoryProvider implements MemoryProvider {
-  private ownedConnection: QortexMcpConnection | null = null;
-  private sharedConnection: QortexMcpConnection | null = null;
+  private ownedConnection: QortexConnection | null = null;
+  private sharedConnection: QortexConnection | null = null;
   private lastQueryId: string | null = null;
 
   constructor(
@@ -84,14 +85,14 @@ export class QortexMemoryProvider implements MemoryProvider {
     private agentId: string,
     private cfg: OpenClawConfig,
     /** Optional shared connection. If provided, init() is a no-op and close() won't close it. */
-    sharedConnection?: QortexMcpConnection,
+    sharedConnection?: QortexConnection,
   ) {
     if (sharedConnection) {
       this.sharedConnection = sharedConnection;
     }
   }
 
-  private get connection(): QortexMcpConnection | null {
+  private get connection(): QortexConnection | null {
     return this.sharedConnection ?? this.ownedConnection;
   }
 

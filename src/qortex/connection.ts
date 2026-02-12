@@ -11,6 +11,9 @@ import path from "node:path";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 
+import type { QortexConnection } from "./types.js";
+export type { QortexConnection } from "./types.js";
+
 // Timeouts (ms)
 const INIT_TIMEOUT_MS = 15_000;
 const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
@@ -80,7 +83,7 @@ export type QortexConnectionConfig = {
  *
  * Intended as a singleton per agent runtime (gateway or CLI run).
  */
-export class QortexMcpConnection {
+export class QortexMcpConnection implements QortexConnection {
   private client: Client | null = null;
   private transport: StdioClientTransport | null = null;
   private connected = false;
@@ -174,4 +177,23 @@ export function parseCommandString(fullCommand: string): QortexConnectionConfig 
     command: parts[0]!,
     args: parts.slice(1),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Process-level singleton. Set once by the gateway at boot, read by all
+// code paths that need a shared qortex connection (memory tools, learning
+// select/observe, etc.). Callers that get `undefined` create their own
+// one-shot connection as a fallback.
+// ---------------------------------------------------------------------------
+
+let _sharedConnection: QortexConnection | undefined;
+
+/** Store the gateway's shared connection so all subsystems can reuse it. */
+export function setSharedQortexConnection(conn: QortexConnection): void {
+  _sharedConnection = conn;
+}
+
+/** Retrieve the shared connection (undefined when running outside gateway). */
+export function getSharedQortexConnection(): QortexConnection | undefined {
+  return _sharedConnection;
 }

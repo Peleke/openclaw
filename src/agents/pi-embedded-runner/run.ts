@@ -46,6 +46,7 @@ import { normalizeUsage, type UsageLike } from "../usage.js";
 import { observeRunOutcomes } from "../../learning/qortex-adapter.js";
 import { QortexLearningClient } from "../../learning/qortex-client.js";
 import { QortexMcpConnection, parseCommandString } from "../../qortex/connection.js";
+import type { QortexConnection } from "../../qortex/types.js";
 import { captureAndStoreGreenTrace } from "../../green/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
@@ -358,6 +359,7 @@ export async function runEmbeddedPiAgent(
             streamParams: params.streamParams,
             ownerNumbers: params.ownerNumbers,
             enforceFinalTag: params.enforceFinalTag,
+            qortexConnection: params.qortexConnection,
           });
 
           const { aborted, promptError, timedOut, sessionIdUsed, lastAssistant } = attempt;
@@ -659,11 +661,20 @@ export async function runEmbeddedPiAgent(
           ) {
             try {
               const learningCfg = params.config.learning;
-              const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
-              const connConfig = parseCommandString(qortexCmd);
-              const conn = new QortexMcpConnection(connConfig);
-              try {
+              // Prefer shared connection; fall back to one-shot.
+              const shared = params.qortexConnection;
+              let conn: QortexConnection;
+              let ownsConn: boolean;
+              if (shared?.isConnected) {
+                conn = shared;
+                ownsConn = false;
+              } else {
+                const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
+                conn = new QortexMcpConnection(parseCommandString(qortexCmd));
                 await conn.init();
+                ownsConn = true;
+              }
+              try {
                 const client = new QortexLearningClient(conn, learningCfg.learnerName);
                 await observeRunOutcomes({
                   client,
@@ -680,7 +691,7 @@ export async function runEmbeddedPiAgent(
                   },
                 });
               } finally {
-                await conn.close();
+                if (ownsConn) await conn.close();
               }
             } catch (err) {
               log.debug(`learning: post-run observation failed: ${String(err)}`);

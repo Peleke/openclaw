@@ -104,25 +104,43 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
-  // Learning API — lazily connect to qortex on first request
+  // Shared qortex connection: one subprocess for the entire gateway lifetime.
+  // Used by learning API, learning select/observe (agent runs), memory search/get/feedback.
+  // Eagerly initialized so it's ready before the first message arrives.
+  try {
+    const { QortexMcpConnection, parseCommandString, setSharedQortexConnection } =
+      await import("../qortex/connection.js");
+    const learningCfg = params.cfg?.learning;
+    const memoryCfg = params.cfg?.agents?.defaults?.memorySearch;
+    const qortexCmd =
+      learningCfg?.qortex?.command ?? memoryCfg?.qortex?.command ?? "uvx qortex mcp-serve";
+    const connConfig = parseCommandString(qortexCmd);
+    const sharedConn = new QortexMcpConnection(connConfig);
+    try {
+      await sharedConn.init();
+      setSharedQortexConnection(sharedConn);
+    } catch (err) {
+      params.log.warn(`qortex shared connection failed to init: ${String(err)}`);
+    }
+  } catch {
+    // Qortex module not available; skip
+  }
+
+  // Learning API — uses the shared qortex connection
   let handleLearningApiRequest: import("./server-http.js").HooksRequestHandler | undefined;
   try {
     const { createLearningApiHandler } = await import("../learning/api.js");
     const { QortexLearningClient } = await import("../learning/qortex-client.js");
-    const { QortexMcpConnection, parseCommandString } = await import("../qortex/connection.js");
+    const { getSharedQortexConnection } = await import("../qortex/connection.js");
     let learningClient: InstanceType<typeof QortexLearningClient> | null = null;
-    let learningConn: InstanceType<typeof QortexMcpConnection> | null = null;
     const learningCfg = params.cfg?.learning;
-    const qortexCmd = learningCfg?.qortex?.command ?? "uvx qortex mcp-serve";
     handleLearningApiRequest = createLearningApiHandler({
       getClient: () => {
         if (!learningClient) {
           try {
-            const connConfig = parseCommandString(qortexCmd);
-            learningConn = new QortexMcpConnection(connConfig);
-            // init is async — start it but don't block; client checks isAvailable
-            learningConn.init().catch(() => {});
-            learningClient = new QortexLearningClient(learningConn, learningCfg?.learnerName);
+            const conn = getSharedQortexConnection();
+            if (!conn) return null;
+            learningClient = new QortexLearningClient(conn, learningCfg?.learnerName);
           } catch {
             return null;
           }
