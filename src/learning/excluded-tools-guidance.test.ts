@@ -38,4 +38,30 @@ describe("buildExcludedToolsGuidance()", () => {
     const result = buildExcludedToolsGuidance(["tool:exec:bash", "malformed", "also:bad"]);
     expect(result).toContain("bash");
   });
+
+  it("handles arm IDs with embedded colons in the id segment", () => {
+    const result = buildExcludedToolsGuidance(["tool:exec:mcp:my:tool"]);
+    expect(result).toContain("mcp:my:tool");
+    expect(result).toContain("unavailable");
+  });
+
+  it("sanitizes control characters and truncates long tool names", () => {
+    const result = buildExcludedToolsGuidance([
+      "tool:exec:bad\x00name",
+      `tool:exec:${"a".repeat(100)}`,
+    ]);
+    expect(result).toContain("badname");
+    expect(result).not.toContain("\x00");
+    expect(result).toContain("a".repeat(64));
+    expect(result).not.toContain("a".repeat(65));
+  });
+
+  it("property: every tool-type arm name appears in the output", () => {
+    const toolNames = ["bash", "Read", "webSearch", "sendMessage", "customTool"];
+    const arms = toolNames.map((n) => `tool:other:${n}`);
+    const result = buildExcludedToolsGuidance(arms)!;
+    for (const name of toolNames) {
+      expect(result).toContain(name);
+    }
+  });
 });

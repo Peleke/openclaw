@@ -20,7 +20,9 @@ export function buildExcludedToolsGuidance(excludedArms?: string[]): string | nu
   for (const armId of excludedArms) {
     const parsed = parseArmId(armId);
     if (parsed?.type === "tool") {
-      excludedToolNames.push(parsed.id);
+      // Sanitize: strip control chars and limit length to prevent prompt injection
+      const safe = parsed.id.replace(/[\x00-\x1f]/g, "").slice(0, 64);
+      if (safe) excludedToolNames.push(safe);
     }
   }
 
