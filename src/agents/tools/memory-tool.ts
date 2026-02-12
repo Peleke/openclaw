@@ -2,7 +2,6 @@ import { Type } from "@sinclair/typebox";
 
 import type { OpenClawConfig } from "../../config/config.js";
 import { getMemoryProvider } from "../../memory/search-manager.js";
-import type { QortexMemoryProvider } from "../../memory/providers/qortex.js";
 import { resolveSessionAgentId } from "../agent-scope.js";
 import { resolveMemorySearchConfig } from "../memory-search.js";
 import type { AnyAgentTool } from "./common.js";
@@ -55,7 +54,7 @@ export function createMemorySearchTool(options: {
     label: "Memory Search",
     name: "memory_search",
     description:
-      "Mandatory recall step: semantically search MEMORY.md + memory/*.md (and optional session transcripts) before answering questions about prior work, decisions, dates, people, preferences, or todos; returns top snippets with path + lines.",
+      "Mandatory recall step: semantically search MEMORY.md + memory/*.md (and optional session transcripts) before answering questions about prior work, decisions, dates, people, preferences, or todos; returns top snippets with path + lines. Response may include `rules` (extracted patterns with confidence/relevance scores) and `queryId` (pass to memory_feedback with item outcomes to improve future retrieval).",
     parameters: MemorySearchSchema,
     execute: async (_toolCallId, params) => {
       const query = readStringParam(params, "query", { required: true });
@@ -70,7 +69,7 @@ export function createMemorySearchTool(options: {
         return jsonResult({ results: [], disabled: true, error });
       }
       try {
-        const results = await provider.search(query, {
+        const { results, rules, queryId } = await provider.search(query, {
           maxResults,
           minScore,
           sessionKey: options.agentSessionKey,
@@ -78,6 +77,8 @@ export function createMemorySearchTool(options: {
         const status = provider.status();
         return jsonResult({
           results,
+          ...(rules?.length ? { rules } : {}),
+          ...(queryId ? { queryId } : {}),
           provider: status.provider,
           model: status.model,
           fallback: status.fallback,
@@ -157,7 +158,7 @@ export function createMemoryFeedbackTool(options: {
     label: "Memory Feedback",
     name: "memory_feedback",
     description:
-      "Rate a memory search result to improve future retrieval. Call after using memory_search results. Only works with the qortex provider.",
+      "Rate a memory search result to improve future retrieval. Pass the `queryId` from memory_search response as `query_id`, the result's `id` as `item_id`, and outcome as `accepted`/`rejected`/`partial`. Call after using memory_search results to close the feedback loop.",
     parameters: MemoryFeedbackSchema,
     execute: async (_toolCallId, params) => {
       const queryId = readStringParam(params, "query_id", { required: true });
@@ -178,15 +179,14 @@ export function createMemoryFeedbackTool(options: {
         return jsonResult({ ok: false, error });
       }
       try {
-        const qortex = provider as QortexMemoryProvider;
-        if (typeof qortex.feedback !== "function") {
+        if (typeof provider.feedback !== "function") {
           return jsonResult({
             ok: true,
             skipped: true,
             reason: "provider does not support feedback",
           });
         }
-        await qortex.feedback(queryId, {
+        await provider.feedback(queryId, {
           [itemId]: outcome as "accepted" | "rejected" | "partial",
         });
         return jsonResult({ ok: true });

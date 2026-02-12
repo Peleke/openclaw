@@ -1,5 +1,10 @@
 import type { MemoryIndexManager } from "../manager.js";
-import type { MemoryProvider, MemoryProviderStatus, SyncResult } from "./types.js";
+import type {
+  MemoryProvider,
+  MemoryProviderStatus,
+  MemorySearchResponse,
+  SyncResult,
+} from "./types.js";
 
 /**
  * Thin adapter that wraps the existing `MemoryIndexManager` behind the
@@ -11,8 +16,9 @@ export class SqliteMemoryProvider implements MemoryProvider {
   async search(
     query: string,
     options?: { maxResults?: number; minScore?: number; sessionKey?: string },
-  ) {
-    return this.manager.search(query, options);
+  ): Promise<MemorySearchResponse> {
+    const results = await this.manager.search(query, options);
+    return { results };
   }
 
   async readFile(params: { relPath: string; from?: number; lines?: number }) {

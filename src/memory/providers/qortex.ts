@@ -16,6 +16,7 @@ import type {
   MemoryProvider,
   MemoryProviderHooks,
   MemoryProviderStatus,
+  MemorySearchResponse,
   SyncResult,
 } from "./types.js";
 
@@ -69,18 +70,30 @@ type QortexQueryResponse = {
 export const parseToolResult = sharedParseToolResult;
 
 /** @internal Exported for testing. */
-export function mapQueryItems(response: QortexQueryResponse): MemorySearchResult[] {
-  if (!Array.isArray(response.items)) return [];
-  return response.items.map((item) => ({
-    path: (item.metadata?.path as string) ?? `<qortex:${item.domain}>`,
-    startLine: (item.metadata?.start_line as number) ?? 0,
-    endLine: (item.metadata?.end_line as number) ?? 0,
-    score: item.score,
-    snippet: item.content,
-    source: ((item.metadata?.source as string) === "sessions" ? "sessions" : "memory") as
-      | "memory"
-      | "sessions",
-  }));
+export function mapQueryResponse(response: QortexQueryResponse): MemorySearchResponse {
+  const results: MemorySearchResult[] = Array.isArray(response.items)
+    ? response.items.map((item) => ({
+        path: (item.metadata?.path as string) ?? `<qortex:${item.domain}>`,
+        startLine: (item.metadata?.start_line as number) ?? 0,
+        endLine: (item.metadata?.end_line as number) ?? 0,
+        score: item.score,
+        snippet: item.content,
+        source: ((item.metadata?.source as string) === "sessions" ? "sessions" : "memory") as
+          | "memory"
+          | "sessions",
+      }))
+    : [];
+  return {
+    results,
+    rules: response.rules?.map((r) => ({
+      id: r.id,
+      text: r.text,
+      domain: r.domain,
+      confidence: r.confidence,
+      relevance: r.relevance,
+    })),
+    queryId: response.query_id || undefined,
+  };
 }
 
 // ── Provider ────────────────────────────────────────────────────────────────
@@ -88,7 +101,6 @@ export function mapQueryItems(response: QortexQueryResponse): MemorySearchResult
 export class QortexMemoryProvider implements MemoryProvider {
   private ownedConnection: QortexConnection | null = null;
   private sharedConnection: QortexConnection | null = null;
-  private lastQueryId: string | null = null;
   /** Content hashes from last sync — skip re-ingest for unchanged files. */
   private ingestedHashes = new Map<string, string>();
   /** Whether we've ever synced (for onFirstSync hook). */
@@ -130,7 +142,7 @@ export class QortexMemoryProvider implements MemoryProvider {
   async search(
     query: string,
     options?: { maxResults?: number; minScore?: number; sessionKey?: string },
-  ): Promise<MemorySearchResult[]> {
+  ): Promise<MemorySearchResponse> {
     this.assertConnected();
     const response = (await this.connection!.callTool(
       "qortex_query",
@@ -143,8 +155,7 @@ export class QortexMemoryProvider implements MemoryProvider {
       },
       { timeout: QUERY_TIMEOUT_MS },
     )) as QortexQueryResponse;
-    if (response.query_id) this.lastQueryId = response.query_id;
-    return mapQueryItems(response);
+    return mapQueryResponse(response);
   }
 
   async readFile(params: {
@@ -187,7 +198,7 @@ export class QortexMemoryProvider implements MemoryProvider {
     // File not found — fall back to DB via search
     if (this.connected) {
       try {
-        const results = await this.search(`file:${params.relPath}`, { maxResults: 1 });
+        const { results } = await this.search(`file:${params.relPath}`, { maxResults: 1 });
         if (results.length > 0 && results[0]!.snippet) {
           log.info(`readFile: serving ${params.relPath} from DB (file not on disk)`);
           return { text: results[0]!.snippet, path: params.relPath };
@@ -268,11 +279,6 @@ export class QortexMemoryProvider implements MemoryProvider {
       { query_id: queryId, outcomes, source: "openclaw" },
       { timeout: FEEDBACK_TIMEOUT_MS },
     );
-  }
-
-  /** The query_id from the most recent search (for feedback). */
-  get currentQueryId(): string | null {
-    return this.lastQueryId;
   }
 
   status(): MemoryProviderStatus {

@@ -8,6 +8,8 @@ export type {
   MemoryProvider,
   MemoryProviderHooks,
   MemoryProviderStatus,
+  MemoryRule,
+  MemorySearchResponse,
   SyncResult,
   MemorySearchResult,
 } from "./types.js";
