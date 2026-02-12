@@ -24,6 +24,8 @@ After each run, the learning layer checks whether each included arm was actually
 
 Only included arms receive updates. Excluded arms have no observed outcome, so their posteriors remain unchanged. This is a key property — the system doesn't penalize arms it chose not to include.
 
+When tools are excluded, the system injects guidance into the model's system prompt listing which tools are unavailable. This allows the model to gracefully explain to users that a capability is temporarily excluded and suggest alternatives, rather than silently producing an empty response.
+
 ## Initial Priors
 
 Priors encode domain knowledge about how likely an arm is to be useful before any data is observed.

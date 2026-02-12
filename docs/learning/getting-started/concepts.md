@@ -112,9 +112,13 @@ This is the default and is safe to leave on indefinitely.
 In active mode, the learning layer **optimizes prompt composition**:
 
 - Thompson Sampling selects arms within the token budget
-- Seed arms and underexplored arms are always included
+- Seed arms and underexplored arms (fewer than `minPulls` observations) are always included
 - Baseline runs (configurable rate) use the full prompt for comparison
 - Posteriors are updated after each run
+
+#### Excluded-Tools Guidance
+
+When Thompson Sampling excludes tools from a run, the system injects guidance into the model's system prompt listing which tools are currently unavailable. This means the model can explain to users when a requested capability is temporarily excluded, rather than silently producing an empty or confused response.
 
 **When to switch to active:**
 
