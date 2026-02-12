@@ -10,19 +10,23 @@ const memoryCorePlugin = {
   register(api: OpenClawPluginApi) {
     api.registerTool(
       (ctx) => {
+        const qortexConnection = api.runtime.tools.getSharedQortexConnection();
         const memorySearchTool = api.runtime.tools.createMemorySearchTool({
           config: ctx.config,
           agentSessionKey: ctx.sessionKey,
+          qortexConnection,
         });
         const memoryGetTool = api.runtime.tools.createMemoryGetTool({
           config: ctx.config,
           agentSessionKey: ctx.sessionKey,
+          qortexConnection,
         });
         if (!memorySearchTool || !memoryGetTool) return null;
         const tools = [memorySearchTool, memoryGetTool];
         const feedbackTool = api.runtime.tools.createMemoryFeedbackTool({
           config: ctx.config,
           agentSessionKey: ctx.sessionKey,
+          qortexConnection,
         });
         if (feedbackTool) tools.push(feedbackTool);
         return tools;
