@@ -36,6 +36,7 @@ export type QortexArm = {
  * Fields: selected_arms, excluded_arms, is_baseline, scores, token_budget, used_tokens
  */
 export type QortexSelectResult = {
+  /** Arm IDs (normalized to strings at client boundary). */
   selected_arms: string[];
   excluded_arms: string[];
   is_baseline: boolean;
@@ -107,6 +108,13 @@ export type QortexSessionEndResult = {
   ended_at: string;
 };
 
+/** Coerce arm entry to string ID (qortex returns {id, metadata, token_cost} objects). */
+function toArmId(raw: unknown): string {
+  if (typeof raw === "string") return raw;
+  if (raw && typeof raw === "object" && "id" in raw) return String((raw as { id: unknown }).id);
+  return String(raw);
+}
+
 // ── Client ───────────────────────────────────────────────────────────────────
 
 export class QortexLearningClient {
@@ -168,6 +176,9 @@ export class QortexLearningClient {
         },
         { timeout: SELECT_TIMEOUT_MS },
       )) as QortexSelectResult;
+      // Normalize: qortex returns Arm objects, we need string IDs downstream
+      result.selected_arms = result.selected_arms.map(toArmId);
+      result.excluded_arms = result.excluded_arms.map(toArmId);
       return result;
     } catch (err) {
       this.warnOnce("select", `qortex learning select failed, falling back to all: ${String(err)}`);

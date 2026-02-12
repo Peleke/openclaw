@@ -126,6 +126,28 @@ describe("QortexLearningClient", () => {
       );
     });
 
+    it("normalizes object arm entries from qortex to string IDs", async () => {
+      const conn = mockConnection({
+        callTool: vi.fn(async () => ({
+          selected_arms: [
+            { id: "tool:exec:bash", metadata: {}, token_cost: 100 },
+            "skill:coding:main",
+          ],
+          excluded_arms: [{ id: "file:workspace:notes.md", metadata: {}, token_cost: 50 }],
+          is_baseline: false,
+          scores: {},
+          token_budget: 8000,
+          used_tokens: 500,
+        })),
+      });
+      const client = new QortexLearningClient(conn);
+
+      const result = await client.select([{ id: "a" }]);
+
+      expect(result.selected_arms).toEqual(["tool:exec:bash", "skill:coding:main"]);
+      expect(result.excluded_arms).toEqual(["file:workspace:notes.md"]);
+    });
+
     it("falls back to all candidates when connection unavailable", async () => {
       const conn = mockConnection({ isConnected: false });
       const client = new QortexLearningClient(conn);
