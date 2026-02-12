@@ -1,0 +1,35 @@
+flowchart TB
+    subgraph Request["Agent Request"]
+        PS[Pre-Run Selection]
+        TS[Thompson Sampling]
+        PA[Prompt Assembly]
+    end
+
+    subgraph Feedback["Post-Run Feedback"]
+        RD[Reference Detection]
+        PU[Post-Run Update]
+    end
+
+    subgraph Storage["Persistence"]
+        DB[(Posteriors<br/>SQLite)]
+    end
+
+    subgraph Observe["Observability"]
+        CLI[CLI]
+        DASH[Dashboard]
+        API[REST API]
+        EXP[Export]
+    end
+
+    PS --> TS
+    TS --> PA
+    PA --> RD
+    RD --> PU
+    PU --> DB
+    DB --> PS
+    DB --> Observe
+
+    style Request fill:#e3f2fd
+    style Feedback fill:#fce4ec
+    style Storage fill:#fff3e0
+    style Observe fill:#e8f5e9
