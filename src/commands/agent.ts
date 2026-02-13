@@ -19,6 +19,7 @@ import {
   resolveThinkingDefault,
 } from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
+import { getSharedQortexConnection } from "../qortex/connection.js";
 import { buildWorkspaceSkillSnapshot } from "../agents/skills.js";
 import { getSkillsSnapshotVersion } from "../agents/skills/refresh.js";
 import { resolveAgentTimeoutMs } from "../agents/timeout.js";
@@ -444,6 +445,7 @@ export async function agentCommand(
             extraSystemPrompt: opts.extraSystemPrompt,
             streamParams: opts.streamParams,
             agentDir,
+            qortexConnection: getSharedQortexConnection(),
             onAgentEvent: (evt) => {
               // Track lifecycle end for fallback emission below.
               if (

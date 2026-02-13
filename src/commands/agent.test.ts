@@ -13,6 +13,13 @@ vi.mock("../agents/pi-embedded.js", () => ({
 vi.mock("../agents/model-catalog.js", () => ({
   loadModelCatalog: vi.fn(),
 }));
+vi.mock("../qortex/connection.js", async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return {
+    ...actual,
+    getSharedQortexConnection: vi.fn(() => "mock-qortex-conn"),
+  };
+});
 
 import { loadModelCatalog } from "../agents/model-catalog.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
@@ -414,6 +421,18 @@ describe("agentCommand", () => {
       await agentCommand({ message: "hi", agentId: "ops" }, runtime);
 
       expect(runtime.log).toHaveBeenCalledWith("ok");
+    });
+  });
+
+  it("passes qortexConnection from getSharedQortexConnection to runEmbeddedPiAgent", async () => {
+    await withTempHome(async (home) => {
+      const store = path.join(home, "sessions.json");
+      mockConfig(home, store);
+
+      await agentCommand({ message: "hi", to: "+1555" }, runtime);
+
+      const callArgs = vi.mocked(runEmbeddedPiAgent).mock.calls.at(-1)?.[0];
+      expect(callArgs?.qortexConnection).toBe("mock-qortex-conn");
     });
   });
 });

@@ -43,10 +43,7 @@ import {
 } from "../pi-embedded-helpers.js";
 import { normalizeUsage, type UsageLike } from "../usage.js";
 
-import { observeRunOutcomes } from "../../learning/qortex-adapter.js";
-import { QortexLearningClient } from "../../learning/qortex-client.js";
-import { QortexMcpConnection, parseCommandString } from "../../qortex/connection.js";
-import type { QortexConnection } from "../../qortex/types.js";
+import { observeRunOutcomes, withLearningConnection } from "../../learning/qortex-adapter.js";
 import { captureAndStoreGreenTrace } from "../../green/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
@@ -295,6 +292,18 @@ export async function runEmbeddedPiAgent(
         if (!advanced) {
           throwAuthProfileFailover({ allInCooldown: false, error: err });
         }
+      }
+
+      // Learning layer: start qortex session to correlate select/observe within this turn.
+      let learningSessionId: string | null = null;
+      if (params.config?.learning?.enabled && params.config.learning.phase === "active") {
+        const learningCfg = params.config.learning;
+        const sessionResult = await withLearningConnection({
+          learningCfg,
+          sharedConnection: params.qortexConnection,
+          fn: (client) => client.sessionStart(params.sessionKey ?? params.sessionId ?? "unknown"),
+        });
+        learningSessionId = sessionResult?.session_id ?? null;
       }
 
       let overflowCompactionAttempted = false;
@@ -659,27 +668,15 @@ export async function runEmbeddedPiAgent(
             params.config.learning.phase === "active" &&
             attempt.learningSelection
           ) {
-            try {
-              const learningCfg = params.config.learning;
-              // Prefer shared connection; fall back to one-shot.
-              const shared = params.qortexConnection;
-              let conn: QortexConnection;
-              let ownsConn: boolean;
-              if (shared?.isConnected) {
-                conn = shared;
-                ownsConn = false;
-              } else {
-                const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
-                conn = new QortexMcpConnection(parseCommandString(qortexCmd));
-                await conn.init();
-                ownsConn = true;
-              }
-              try {
-                const client = new QortexLearningClient(conn, learningCfg.learnerName);
-                await observeRunOutcomes({
+            const learningCfg = params.config.learning;
+            await withLearningConnection({
+              learningCfg,
+              sharedConnection: params.qortexConnection,
+              fn: (client) =>
+                observeRunOutcomes({
                   client,
                   config: learningCfg,
-                  selection: attempt.learningSelection,
+                  selection: attempt.learningSelection!,
                   assistantTexts: attempt.assistantTexts,
                   toolMetas: attempt.toolMetas,
                   context: {
@@ -689,13 +686,8 @@ export async function runEmbeddedPiAgent(
                     provider,
                     model: modelId,
                   },
-                });
-              } finally {
-                if (ownsConn) await conn.close();
-              }
-            } catch (err) {
-              log.warn(`learning: post-run observation failed: ${String(err)}`);
-            }
+                }),
+            });
           }
 
           // Green layer: carbon trace capture (always on unless explicitly disabled)
@@ -741,6 +733,15 @@ export async function runEmbeddedPiAgent(
           };
         }
       } finally {
+        // Learning layer: end qortex session (skip if session_start failed or was skipped).
+        if (learningSessionId !== null && params.config?.learning?.enabled) {
+          const learningCfg = params.config.learning!;
+          await withLearningConnection({
+            learningCfg,
+            sharedConnection: params.qortexConnection,
+            fn: (client) => client.sessionEnd(learningSessionId!),
+          });
+        }
         process.chdir(prevCwd);
       }
     }),

@@ -11,11 +11,13 @@
 
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 
-import type { QortexLearningClient, QortexArm, QortexSelectResult } from "./qortex-client.js";
+import { QortexLearningClient, type QortexArm, type QortexSelectResult } from "./qortex-client.js";
 import { detectReference } from "./reference-detection.js";
 import type { ArmId, ArmType, LearningConfig, SelectionContext, SelectionResult } from "./types.js";
 import { buildArmId } from "./types.js";
 import { log } from "./logger.js";
+import { QortexMcpConnection, parseCommandString } from "../qortex/connection.js";
+import type { QortexConnection } from "../qortex/connection.js";
 
 // ── Domain types ────────────────────────────────────────────────────
 
@@ -239,6 +241,59 @@ export async function observeRunOutcomes(params: {
   }
 
   await Promise.allSettled(promises);
+}
+
+// ── Connection helper ───────────────────────────────────────────────
+
+/**
+ * Acquire a qortex learning connection (shared or one-shot) and run a callback.
+ *
+ * Error contract:
+ * - Catches ALL errors (connection failures, callback failures, close failures).
+ * - Logs at warn level on failure.
+ * - Returns null on any error — learning operations are non-blocking by design.
+ * - Uses try/finally to guarantee owned connections are closed.
+ */
+export async function withLearningConnection<T>(params: {
+  learningCfg: LearningConfig;
+  sharedConnection: QortexConnection | undefined;
+  fn: (client: QortexLearningClient) => Promise<T>;
+}): Promise<T | null> {
+  const { learningCfg, sharedConnection, fn } = params;
+
+  let conn: QortexConnection;
+  let ownsConn: boolean;
+
+  try {
+    if (sharedConnection?.isConnected) {
+      conn = sharedConnection;
+      ownsConn = false;
+    } else {
+      const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
+      conn = new QortexMcpConnection(parseCommandString(qortexCmd));
+      await conn.init();
+      ownsConn = true;
+    }
+  } catch (err) {
+    log.warn(`learning: connection acquisition failed: ${String(err)}`);
+    return null;
+  }
+
+  try {
+    const client = new QortexLearningClient(conn, learningCfg.learnerName);
+    return await fn(client);
+  } catch (err) {
+    log.warn(`learning: operation failed: ${String(err)}`);
+    return null;
+  } finally {
+    if (ownsConn) {
+      try {
+        await conn.close();
+      } catch (closeErr) {
+        log.warn(`learning: connection close failed: ${String(closeErr)}`);
+      }
+    }
+  }
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────

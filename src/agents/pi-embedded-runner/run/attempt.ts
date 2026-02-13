@@ -62,11 +62,12 @@ import { isAbortError } from "../abort.js";
 import { buildEmbeddedExtensionPaths } from "../extensions.js";
 import { applyExtraParamsToAgent } from "../extra-params.js";
 import { appendCacheTtlTimestamp, isCacheTtlEligibleProvider } from "../cache-ttl.js";
-import { selectViaQortex, type AdapterSelectionResult } from "../../../learning/qortex-adapter.js";
+import {
+  selectViaQortex,
+  withLearningConnection,
+  type AdapterSelectionResult,
+} from "../../../learning/qortex-adapter.js";
 import { buildExcludedToolsGuidance } from "../../../learning/excluded-tools-guidance.js";
-import { QortexLearningClient } from "../../../learning/qortex-client.js";
-import { QortexMcpConnection, parseCommandString } from "../../../qortex/connection.js";
-import type { QortexConnection } from "../../../qortex/types.js";
 import {
   logToolSchemasForGoogle,
   sanitizeSessionHistory,
@@ -246,27 +247,15 @@ export async function runEmbeddedAttempt(
     // Learning layer: active arm selection via qortex (before tool sanitization)
     let learningSelection: AdapterSelectionResult | null = null;
     if (params.config?.learning?.phase === "active" && params.config?.learning?.enabled) {
-      try {
-        const learningCfg = params.config.learning;
-        // Prefer shared connection (singleton, kept alive by gateway); fall back to one-shot.
-        const shared = params.qortexConnection;
-        let conn: QortexConnection;
-        let ownsConn: boolean;
-        if (shared?.isConnected) {
-          conn = shared;
-          ownsConn = false;
-        } else {
-          const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
-          conn = new QortexMcpConnection(parseCommandString(qortexCmd));
-          await conn.init();
-          ownsConn = true;
-        }
-        try {
-          const client = new QortexLearningClient(conn, learningCfg.learnerName);
-          const runtimeChannel = normalizeMessageChannel(
-            params.messageChannel ?? params.messageProvider,
-          );
-          learningSelection = await selectViaQortex({
+      const learningCfg = params.config.learning;
+      const runtimeChannel = normalizeMessageChannel(
+        params.messageChannel ?? params.messageProvider,
+      );
+      learningSelection = await withLearningConnection({
+        learningCfg,
+        sharedConnection: params.qortexConnection,
+        fn: (client) =>
+          selectViaQortex({
             client,
             config: learningCfg,
             tools: toolsRaw,
@@ -284,13 +273,8 @@ export async function runEmbeddedAttempt(
               provider: params.provider,
               model: params.modelId,
             },
-          });
-        } finally {
-          if (ownsConn) await conn.close();
-        }
-      } catch (err) {
-        log.warn(`learning: pre-run selection failed: ${String(err)}`);
-      }
+          }),
+      });
     }
 
     // Apply learning selection to filter tools (if active)

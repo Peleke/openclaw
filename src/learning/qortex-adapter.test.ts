@@ -3,12 +3,32 @@ import {
   buildCandidates,
   selectViaQortex,
   observeRunOutcomes,
+  withLearningConnection,
   type SkillEntry,
   type ContextFile,
 } from "./qortex-adapter.js";
 import type { QortexLearningClient, QortexSelectResult } from "./qortex-client.js";
+import type { QortexConnection } from "../qortex/connection.js";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { LearningConfig, SelectionResult } from "./types.js";
+
+// Mock the connection module so withLearningConnection doesn't spawn real processes.
+const mockConnInit = vi.fn(async () => {});
+const mockConnClose = vi.fn(async () => {});
+const mockConnCallTool = vi.fn(async () => ({}));
+vi.mock("../qortex/connection.js", () => ({
+  QortexMcpConnection: vi.fn().mockImplementation(function () {
+    return {
+      init: mockConnInit,
+      close: mockConnClose,
+      isConnected: true,
+      callTool: mockConnCallTool,
+    };
+  }),
+  parseCommandString: vi.fn(() => ({ command: "uvx", args: ["qortex", "mcp-serve"] })),
+  getSharedQortexConnection: vi.fn(() => undefined),
+  setSharedQortexConnection: vi.fn(),
+}));
 
 function makeTool(name: string): AgentTool {
   return {
@@ -484,5 +504,140 @@ describe("observeRunOutcomes()", () => {
 
     // "coding" appears in assistantTexts → referenced
     expect(observeFn).toHaveBeenCalledWith("skill:coding:main", "accepted", expect.any(Object));
+  });
+});
+
+describe("withLearningConnection()", () => {
+  const baseCfg: LearningConfig = { enabled: true, phase: "active" };
+
+  function mockSharedConnection(overrides?: Partial<QortexConnection>) {
+    const closeFn = vi.fn(async () => {});
+    const conn = {
+      isConnected: true,
+      init: vi.fn(async () => {}),
+      close: closeFn,
+      callTool: vi.fn(async () => ({})),
+      ...overrides,
+    } as unknown as QortexConnection;
+    return { conn, closeFn };
+  }
+
+  it("uses shared connection when available and connected", async () => {
+    const { conn: shared, closeFn } = mockSharedConnection();
+    const fn = vi.fn(async () => "result-value");
+
+    const result = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn,
+    });
+
+    expect(result).toBe("result-value");
+    expect(fn).toHaveBeenCalledTimes(1);
+    // Should NOT close the shared connection (not owned)
+    expect(closeFn).not.toHaveBeenCalled();
+  });
+
+  it("spawns one-shot connection when shared is undefined", async () => {
+    const fn = vi.fn(async () => "one-shot-result");
+
+    const result = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: undefined,
+      fn,
+    });
+
+    expect(result).toBe("one-shot-result");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("spawns one-shot connection when shared is disconnected", async () => {
+    const { conn: shared } = mockSharedConnection({ isConnected: false });
+    const fn = vi.fn(async () => "fallback-result");
+
+    const result = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn,
+    });
+
+    expect(result).toBe("fallback-result");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when callback throws", async () => {
+    const { conn: shared } = mockSharedConnection();
+    const fn = vi.fn(async () => {
+      throw new Error("callback boom");
+    });
+
+    const result = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn,
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("returns null when connection acquisition fails", async () => {
+    // Force one-shot path by making shared undefined, and mock QortexMcpConnection to throw
+    const { QortexMcpConnection } = await import("../qortex/connection.js");
+    vi.mocked(QortexMcpConnection).mockImplementationOnce(function () {
+      throw new Error("spawn failed");
+    });
+
+    const result = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: undefined,
+      fn: async () => "should-not-reach",
+    });
+
+    expect(result).toBeNull();
+  });
+
+  it("does not close shared connection even on callback error", async () => {
+    const { conn: shared, closeFn } = mockSharedConnection();
+
+    await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn: async () => {
+        throw new Error("oops");
+      },
+    });
+
+    expect(closeFn).not.toHaveBeenCalled();
+  });
+
+  it("returns callback value of correct generic type", async () => {
+    const { conn: shared } = mockSharedConnection();
+
+    const numResult = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn: async () => 42,
+    });
+    expect(numResult).toBe(42);
+
+    const objResult = await withLearningConnection({
+      learningCfg: baseCfg,
+      sharedConnection: shared,
+      fn: async () => ({ session_id: "abc", learner: "test" }),
+    });
+    expect(objResult).toEqual({ session_id: "abc", learner: "test" });
+  });
+
+  it("uses custom qortex command from config", async () => {
+    const { parseCommandString } = await import("../qortex/connection.js");
+    vi.mocked(parseCommandString).mockClear();
+
+    await withLearningConnection({
+      learningCfg: { ...baseCfg, qortex: { command: "custom-qortex serve" } },
+      sharedConnection: undefined,
+      fn: async () => "ok",
+    });
+
+    expect(parseCommandString).toHaveBeenCalledWith("custom-qortex serve");
   });
 });
