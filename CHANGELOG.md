@@ -2,10 +2,12 @@
 
 Docs: https://docs.openclaw.ai
 
-## 2026.2.12
+## 2026.2.13
 
 ### Changes
 - Learning: wire qortex session tracking (`session_start`/`session_end`) and shared connection on the gateway hot path; deduplicate connection acquisition into `withLearningConnection` helper. (#84)
+
+## 2026.2.12
 
 ### Fixes
 - Learning: forward `minPulls` exploration floor to qortex backend so underexplored arms are always included during active selection. (#79)
