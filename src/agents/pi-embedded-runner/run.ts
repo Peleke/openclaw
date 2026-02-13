@@ -304,6 +304,11 @@ export async function runEmbeddedPiAgent(
           fn: (client) => client.sessionStart(params.sessionKey ?? params.sessionId ?? "unknown"),
         });
         learningSessionId = sessionResult?.session_id ?? null;
+        if (learningSessionId) {
+          log.info(`learning: session_start ok (sessionId=${learningSessionId})`);
+        } else {
+          log.warn(`learning: session_start returned null`);
+        }
       }
 
       let overflowCompactionAttempted = false;
@@ -736,11 +741,14 @@ export async function runEmbeddedPiAgent(
         // Learning layer: end qortex session (skip if session_start failed or was skipped).
         if (learningSessionId !== null && params.config?.learning?.enabled) {
           const learningCfg = params.config.learning!;
-          await withLearningConnection({
+          const endResult = await withLearningConnection({
             learningCfg,
             sharedConnection: params.qortexConnection,
             fn: (client) => client.sessionEnd(learningSessionId!),
           });
+          log.info(
+            `learning: session_end (sessionId=${learningSessionId}, result=${endResult ? "ok" : "null"})`,
+          );
         }
         process.chdir(prevCwd);
       }
