@@ -1,0 +1,106 @@
+{
+  "learnings": {
+    "secu-c9b6c83bba": {
+      "id": "secu-c9b6c83bba",
+      "rule": "Construct URLs using the URL constructor rather than string concatenation, even for internal APIs, to prevent injection if callers change.",
+      "category": "security",
+      "severity": "minor",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "secu-7aecd770dd": {
+      "id": "secu-7aecd770dd",
+      "rule": "Provide a protocol override or auto-detect TLS capability when constructing gateway URLs, even if HTTP-only is the current deployment model.",
+      "category": "security",
+      "severity": "minor",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "secu-0d1f3b79fa": {
+      "id": "secu-0d1f3b79fa",
+      "rule": "Restrict CORS headers to known origins when serving APIs that could contain sensitive data, even for local-only tools.",
+      "category": "security",
+      "severity": "nitpick",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "test-749882ccbf": {
+      "id": "test-749882ccbf",
+      "rule": "CLI action handlers that contain branching logic (API-first with fallback) need automated tests for both branches, not just unit tests of the individual components.",
+      "category": "testing",
+      "severity": "minor",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "test-a0bcffa9fe": {
+      "id": "test-a0bcffa9fe",
+      "rule": "For 'connection refused' tests, prefer ephemeral ports that are provably closed rather than hardcoded low ports.",
+      "category": "testing",
+      "severity": "nitpick",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "test-8b1752b0eb": {
+      "id": "test-8b1752b0eb",
+      "rule": "URL construction functions with composition invariants (output contains inputs) are good candidates for property-based testing.",
+      "category": "testing",
+      "severity": "nitpick",
+      "source": "review:gauntlet:iteration-1",
+      "first_seen": "2026-02-05T06:40:31.086001+00:00",
+      "last_reinforced": "2026-02-05T06:40:31.086001+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    },
+    "secu-e19b6f8e7e": {
+      "id": "secu-e19b6f8e7e",
+      "rule": "Document the security boundary assumptions (loopback-only, WireGuard encryption) when using plaintext HTTP for internal APIs.",
+      "category": "security",
+      "severity": "nitpick",
+      "source": "review:gauntlet:iteration-2",
+      "first_seen": "2026-02-05T06:56:10.716384+00:00",
+      "last_reinforced": "2026-02-05T06:56:10.716384+00:00",
+      "reinforcement_count": 1,
+      "contradiction_count": 0
+    }
+  },
+  "review_history": [
+    {
+      "timestamp": "2026-02-05T06:40:31.086001+00:00",
+      "source": "review:gauntlet:iteration-1",
+      "issues_count": 6,
+      "new_learning_ids": [
+        "secu-c9b6c83bba",
+        "secu-7aecd770dd",
+        "secu-0d1f3b79fa",
+        "test-749882ccbf",
+        "test-a0bcffa9fe",
+        "test-8b1752b0eb"
+      ],
+      "reinforced_learning_ids": []
+    },
+    {
+      "timestamp": "2026-02-05T06:56:10.716384+00:00",
+      "source": "review:gauntlet:iteration-2",
+      "issues_count": 1,
+      "new_learning_ids": [
+        "secu-e19b6f8e7e"
+      ],
+      "reinforced_learning_ids": []
+    }
+  ]
+}
