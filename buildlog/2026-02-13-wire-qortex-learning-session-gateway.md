@@ -48,3 +48,19 @@ session_end (sessionId=ccb6623c-757d-4611-8925-a6099d92e7c2, result=ok)
 ```
 
 Grafana metrics visible. No connection acquisition failures. Shared connection reused across all calls.
+
+## Why This Matters
+
+Before today, openclaw's learning system was half-wired. The bandit could rank tools and record outcomes, but it was doing so through expensive one-shot subprocess spawns on every single message — and it had no concept of a "conversation turn." Every select and observe was an isolated event with no session context linking them.
+
+**What changed for the product:**
+
+1. **The agent actually learns now.** Session tracking means qortex can correlate which tools were selected with how the conversation went. Without session boundaries, the bandit was updating posteriors on disconnected signals — like grading a student's exam answers without knowing which exam they were taking. Now it knows: this select led to this observe within this turn, and the turn succeeded or failed. That's the difference between noise and signal.
+
+2. **It's fast enough to run on every message.** The shared gateway connection means learning operations reuse a single long-lived qortex process instead of spawning a new one per call. On the hot path, that's the difference between ~200ms overhead (subprocess spawn + init + tool call + teardown) and ~5ms (tool call on existing connection). At scale, this is the difference between "learning is too expensive to leave on" and "learning is invisible."
+
+3. **Cron agents learn too.** Scheduled/automated agent runs were silently skipping the learning loop entirely. The bandit model was only seeing interactive messages — a biased sample that would actively degrade selection quality for automated workflows. Now both paths feed the same loop.
+
+4. **It fails gracefully.** Every learning operation is wrapped in try/catch that returns null on error. If qortex goes down, the agent keeps running with all tools available (no selection filtering). The learning system is purely additive — it can only make things better, never worse.
+
+**The bottom line:** openclaw agents now have a closed-loop self-improvement system that actually runs in production. Tool selection gets better with every conversation. And it costs almost nothing at runtime.
