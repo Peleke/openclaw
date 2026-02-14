@@ -1,5 +1,54 @@
-import { describe, it, expect } from "vitest";
-import { extractText, extractErrorText } from "./tool-execution.js";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// Capture setText calls on the Markdown output widget
+const markdownSetText = vi.fn();
+
+vi.mock("@mariozechner/pi-tui", () => {
+  class FakeComponent {
+    addChild() {}
+  }
+  class Box extends FakeComponent {
+    addChild() {}
+    setBgFn() {}
+  }
+  class Text extends FakeComponent {
+    setText() {}
+  }
+  class Markdown extends FakeComponent {
+    setText(text: string) {
+      markdownSetText(text);
+    }
+  }
+  class Spacer extends FakeComponent {}
+  class Container extends FakeComponent {
+    addChild() {}
+  }
+  return { Box, Container, Markdown, Spacer, Text };
+});
+
+vi.mock("../../agents/tool-display.js", () => ({
+  resolveToolDisplay: () => ({ emoji: "🔧", label: "Test Tool" }),
+  formatToolDetail: () => "",
+}));
+
+vi.mock("../theme/theme.js", () => ({
+  theme: {
+    toolPendingBg: (l: string) => l,
+    toolErrorBg: (l: string) => l,
+    toolSuccessBg: (l: string) => l,
+    toolTitle: (l: string) => l,
+    toolOutput: (l: string) => l,
+    bold: (l: string) => l,
+    dim: (l: string) => l,
+  },
+  markdownTheme: {},
+}));
+
+import { extractText, extractErrorText, ToolExecutionComponent } from "./tool-execution.js";
+
+beforeEach(() => {
+  markdownSetText.mockClear();
+});
 
 describe("extractText", () => {
   it("returns text from text content blocks", () => {
@@ -72,16 +121,76 @@ describe("extractErrorText", () => {
     expect(extractErrorText(result)).toBe("spaced out");
   });
 
-  // Regression: tool errors previously showed empty TUI message
-  // because extractText only looked at content blocks, ignoring details.
   it("extracts error when content has no text blocks (regression)", () => {
     const result = {
       content: [],
       details: { status: "error", error: "openai embeddings failed: 429" },
     };
-    // extractText returns "" for this result (no text blocks)
     expect(extractText(result)).toBe("");
-    // extractErrorText should recover the error message
     expect(extractErrorText(result)).toBe("openai embeddings failed: 429");
+  });
+});
+
+describe("ToolExecutionComponent (integration)", () => {
+  it("displays error text when tool result has no content but has details.error", () => {
+    const component = new ToolExecutionComponent("test_tool", {});
+    markdownSetText.mockClear();
+
+    component.setResult(
+      { content: [], details: { status: "error", error: "Command failed with exit code 1" } },
+      { isError: true },
+    );
+
+    const lastCall = markdownSetText.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBe("Command failed with exit code 1");
+  });
+
+  it("displays error text from details.message", () => {
+    const component = new ToolExecutionComponent("test_tool", {});
+    markdownSetText.mockClear();
+
+    component.setResult(
+      { content: [], details: { status: "error", message: "Rate limit exceeded: 429" } },
+      { isError: true },
+    );
+
+    const lastCall = markdownSetText.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBe("Rate limit exceeded: 429");
+  });
+
+  it("prefers content text over error fallback when both exist", () => {
+    const component = new ToolExecutionComponent("test_tool", {});
+    markdownSetText.mockClear();
+
+    component.setResult(
+      {
+        content: [{ type: "text", text: "Detailed error output here" }],
+        details: { status: "error", error: "short error" },
+      },
+      { isError: true },
+    );
+
+    const lastCall = markdownSetText.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBe("Detailed error output here");
+  });
+
+  it("shows empty string for non-error result with no content (not a regression)", () => {
+    const component = new ToolExecutionComponent("test_tool", {});
+    markdownSetText.mockClear();
+
+    component.setResult({ content: [] }, { isError: false });
+
+    const lastCall = markdownSetText.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBe("");
+  });
+
+  it("shows ellipsis for partial result with no content", () => {
+    const component = new ToolExecutionComponent("test_tool", {});
+    markdownSetText.mockClear();
+
+    component.setPartialResult({ content: [] });
+
+    const lastCall = markdownSetText.mock.calls.at(-1)?.[0];
+    expect(lastCall).toBe("…");
   });
 });
