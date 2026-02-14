@@ -30,7 +30,7 @@ function formatArgs(toolName: string, args: unknown): string {
 }
 
 /** Extract displayable text from tool result content blocks. */
-function extractText(result?: ToolResult): string {
+export function extractText(result?: ToolResult): string {
   if (!result?.content) return "";
   const lines: string[] = [];
   for (const entry of result.content) {
@@ -47,7 +47,7 @@ function extractText(result?: ToolResult): string {
 }
 
 /** Pull an error message from result.details (status/error/message/reason). */
-function extractErrorText(result?: ToolResult): string {
+export function extractErrorText(result?: ToolResult): string {
   const details = result?.details;
   if (!details || typeof details !== "object") return "";
   for (const key of ["error", "message", "reason"] as const) {
