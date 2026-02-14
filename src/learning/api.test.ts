@@ -9,6 +9,7 @@ function mockClient(overrides?: Partial<QortexLearningClient>): QortexLearningCl
     isAvailable: true,
     select: vi.fn(),
     observe: vi.fn(),
+    reset: vi.fn(async () => ({ learner: "openclaw", reset_count: 0, arm_ids: [] })),
     posteriors: vi.fn(async () => ({
       learner: "openclaw",
       posteriors: {},
@@ -27,8 +28,19 @@ function mockClient(overrides?: Partial<QortexLearningClient>): QortexLearningCl
   } as unknown as QortexLearningClient;
 }
 
-function mockReqRes(method: string, url: string) {
-  const req = { method, url, headers: {} } as unknown as IncomingMessage;
+function mockReqRes(method: string, url: string, jsonBody?: Record<string, unknown>) {
+  // Simulate a readable stream with optional JSON body
+  const bodyStr = jsonBody ? JSON.stringify(jsonBody) : "";
+  const req = {
+    method,
+    url,
+    headers: { "content-type": "application/json" },
+    on(event: string, cb: (...args: unknown[]) => void) {
+      if (event === "data" && bodyStr) cb(Buffer.from(bodyStr));
+      if (event === "end") cb();
+      // "error" is registered but never fired in tests
+    },
+  } as unknown as IncomingMessage;
   let statusCode = 0;
   let body = "";
   const headers: Record<string, string> = {};
@@ -309,11 +321,147 @@ describe("learning API handler", () => {
     expect(getStatus()).toBe(404);
   });
 
-  it("returns 405 for non-GET methods on data routes", async () => {
+  it("returns 405 for non-GET methods on GET-only routes", async () => {
     const handler = createLearningApiHandler({ getClient: () => mockClient() });
     const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/summary");
     await handler(req, res);
     expect(getStatus()).toBe(405);
+  });
+
+  describe("POST /reset", () => {
+    it("resets all arms when no body", async () => {
+      const resetFn = vi.fn(async () => ({
+        learner: "openclaw",
+        reset_count: 5,
+        arm_ids: ["a", "b", "c", "d", "e"],
+      }));
+      const client = mockClient({ reset: resetFn } as unknown as Partial<QortexLearningClient>);
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "POST",
+        "/__openclaw__/api/learning/reset",
+      );
+      await handler(req, res);
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+      expect(data.reset_count).toBe(5);
+      expect(resetFn).toHaveBeenCalledWith(undefined);
+    });
+
+    it("resets specific arms when arm_ids provided", async () => {
+      const resetFn = vi.fn(async () => ({
+        learner: "openclaw",
+        reset_count: 2,
+        arm_ids: ["a", "b"],
+      }));
+      const client = mockClient({ reset: resetFn } as unknown as Partial<QortexLearningClient>);
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/reset", {
+        arm_ids: ["a", "b"],
+      });
+      await handler(req, res);
+      expect(getStatus()).toBe(200);
+      expect(resetFn).toHaveBeenCalledWith({ arm_ids: ["a", "b"] });
+    });
+
+    it("returns 503 when reset fails", async () => {
+      const client = mockClient({
+        reset: vi.fn(async () => null),
+      } as unknown as Partial<QortexLearningClient>);
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/reset");
+      await handler(req, res);
+      expect(getStatus()).toBe(503);
+    });
+
+    it("returns 405 for GET on /reset", async () => {
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
+      const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/reset");
+      await handler(req, res);
+      expect(getStatus()).toBe(405);
+    });
+  });
+
+  describe("POST /reward", () => {
+    it("records a lagged reward observation", async () => {
+      const observeFn = vi.fn(async () => ({
+        arm_id: "tool:web:web_search",
+        alpha: 3,
+        beta: 1,
+        mean: 0.75,
+        pulls: 3,
+      }));
+      const client = mockClient({ observe: observeFn });
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getBody, getStatus } = mockReqRes(
+        "POST",
+        "/__openclaw__/api/learning/reward",
+        { arm_id: "tool:web:web_search", outcome: "accepted", reward: 1.0, reason: "useful" },
+      );
+      await handler(req, res);
+      expect(getStatus()).toBe(200);
+      const data = JSON.parse(getBody());
+      expect(data.ok).toBe(true);
+      expect(data.arm_id).toBe("tool:web:web_search");
+      expect(observeFn).toHaveBeenCalledWith(
+        "tool:web:web_search",
+        "accepted",
+        expect.objectContaining({
+          reward: 1.0,
+          context: { lagged: true, reason: "useful" },
+        }),
+      );
+    });
+
+    it("defaults to accepted with reward 1.0 when outcome not specified", async () => {
+      const observeFn = vi.fn(async () => ({
+        arm_id: "a",
+        alpha: 2,
+        beta: 1,
+        mean: 0.67,
+        pulls: 2,
+      }));
+      const client = mockClient({ observe: observeFn });
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/reward", {
+        arm_id: "a",
+      });
+      await handler(req, res);
+      expect(getStatus()).toBe(200);
+      expect(observeFn).toHaveBeenCalledWith(
+        "a",
+        "accepted",
+        expect.objectContaining({ reward: 1.0, context: { lagged: true } }),
+      );
+    });
+
+    it("returns 400 when arm_id missing", async () => {
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
+      const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/reward", {
+        outcome: "accepted",
+      });
+      await handler(req, res);
+      expect(getStatus()).toBe(400);
+    });
+
+    it("returns 503 when observe fails", async () => {
+      const client = mockClient({
+        observe: vi.fn(async () => null),
+      });
+      const handler = createLearningApiHandler({ getClient: () => client });
+      const { req, res, getStatus } = mockReqRes("POST", "/__openclaw__/api/learning/reward", {
+        arm_id: "a",
+      });
+      await handler(req, res);
+      expect(getStatus()).toBe(503);
+    });
+
+    it("returns 405 for GET on /reward", async () => {
+      const handler = createLearningApiHandler({ getClient: () => mockClient() });
+      const { req, res, getStatus } = mockReqRes("GET", "/__openclaw__/api/learning/reward");
+      await handler(req, res);
+      expect(getStatus()).toBe(405);
+    });
   });
 
   it("sets CORS header on responses", async () => {

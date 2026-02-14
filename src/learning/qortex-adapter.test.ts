@@ -50,6 +50,7 @@ function mockClient(overrides?: Partial<QortexLearningClient>): QortexLearningCl
       used_tokens: 0,
     })),
     observe: vi.fn(async () => null),
+    reset: vi.fn(async () => null),
     posteriors: vi.fn(async () => null),
     metrics: vi.fn(async () => null),
     sessionStart: vi.fn(async () => null),
@@ -466,7 +467,7 @@ describe("observeRunOutcomes()", () => {
       .mockRejectedValueOnce(new Error("timeout")); // second arm fails
     const client = mockClient({ observe: observeFn });
 
-    // Should not throw
+    // Should not throw — needs a real tool so the guard doesn't skip
     await observeRunOutcomes({
       client,
       config: baseConfig,
@@ -478,10 +479,112 @@ describe("observeRunOutcomes()", () => {
         usedTokens: 200,
       },
       assistantTexts: [],
-      toolMetas: [],
+      toolMetas: [{ toolName: "bash" }],
     });
 
     expect(observeFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("skips observation on conversational turn (empty toolMetas)", async () => {
+    const observeFn = vi.fn(async () => null);
+    const client = mockClient({ observe: observeFn });
+
+    await observeRunOutcomes({
+      client,
+      config: baseConfig,
+      selection: {
+        selectedArms: ["tool:exec:bash", "tool:fs:Read", "skill:coding:main"],
+        excludedArms: [],
+        isBaseline: false,
+        totalTokenBudget: 8000,
+        usedTokens: 300,
+      },
+      assistantTexts: ["Hello! How can I help you today?"],
+      toolMetas: [],
+    });
+
+    // No real tools used → observe should never be called
+    expect(observeFn).not.toHaveBeenCalled();
+  });
+
+  it("skips observation on message-only turn", async () => {
+    const observeFn = vi.fn(async () => null);
+    const client = mockClient({ observe: observeFn });
+
+    await observeRunOutcomes({
+      client,
+      config: baseConfig,
+      selection: {
+        selectedArms: ["tool:exec:bash", "tool:web:webSearch"],
+        excludedArms: [],
+        isBaseline: false,
+        totalTokenBudget: 8000,
+        usedTokens: 200,
+      },
+      assistantTexts: ["Here is my response"],
+      toolMetas: [{ toolName: "message" }],
+    });
+
+    // "message" is a meta-tool, not a real tool selection signal
+    expect(observeFn).not.toHaveBeenCalled();
+  });
+
+  it("observes when real tool used alongside message meta-tool", async () => {
+    const observeFn = vi.fn(async () => null);
+    const client = mockClient({ observe: observeFn });
+
+    await observeRunOutcomes({
+      client,
+      config: baseConfig,
+      selection: {
+        selectedArms: ["tool:exec:bash", "tool:fs:Read"],
+        excludedArms: [],
+        isBaseline: false,
+        totalTokenBudget: 8000,
+        usedTokens: 200,
+      },
+      assistantTexts: ["I ran the bash command"],
+      toolMetas: [{ toolName: "message" }, { toolName: "bash" }],
+    });
+
+    // bash is a real tool → observe should fire for both arms
+    expect(observeFn).toHaveBeenCalledTimes(2);
+    expect(observeFn).toHaveBeenCalledWith(
+      "tool:exec:bash",
+      "accepted",
+      expect.objectContaining({ reward: 1.0 }),
+    );
+    expect(observeFn).toHaveBeenCalledWith(
+      "tool:fs:Read",
+      "rejected",
+      expect.objectContaining({ reward: 0.0 }),
+    );
+  });
+
+  it("observes normally when only real tools used (no message)", async () => {
+    const observeFn = vi.fn(async () => null);
+    const client = mockClient({ observe: observeFn });
+
+    await observeRunOutcomes({
+      client,
+      config: baseConfig,
+      selection: {
+        selectedArms: ["tool:exec:bash"],
+        excludedArms: [],
+        isBaseline: false,
+        totalTokenBudget: 8000,
+        usedTokens: 100,
+      },
+      assistantTexts: ["Running bash"],
+      toolMetas: [{ toolName: "bash" }],
+    });
+
+    expect(observeFn).toHaveBeenCalledTimes(1);
+    expect(observeFn).toHaveBeenCalledWith(
+      "tool:exec:bash",
+      "accepted",
+      expect.objectContaining({ reward: 1.0 }),
+    );
   });
 
   it("observes skill arms correctly", async () => {
@@ -499,7 +602,7 @@ describe("observeRunOutcomes()", () => {
         usedTokens: 100,
       },
       assistantTexts: ["I used the coding skill"],
-      toolMetas: [],
+      toolMetas: [{ toolName: "bash" }], // needs a real tool to pass guard
     });
 
     // "coding" appears in assistantTexts → referenced

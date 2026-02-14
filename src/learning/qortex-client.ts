@@ -92,6 +92,13 @@ export type QortexMetricsResult = {
   explore_ratio: number;
 };
 
+/** Return shape of qortex_learning_reset. */
+export type QortexResetResult = {
+  learner: string;
+  reset_count: number;
+  arm_ids: string[];
+};
+
 /** Return shape of qortex_learning_session_start. */
 export type QortexSessionStartResult = {
   session_id: string;
@@ -262,6 +269,30 @@ export class QortexLearningClient {
       )) as QortexMetricsResult;
     } catch (err) {
       log.debug(`qortex learning metrics failed: ${String(err)}`);
+      return null;
+    }
+  }
+
+  /**
+   * Reset arm posteriors back to uninformative priors Beta(1,1).
+   * No arm_ids → reset ALL arms for learner.
+   * With arm_ids → reset only those arms.
+   *
+   * qortex params: learner, arm_ids
+   */
+  async reset(opts?: { arm_ids?: string[] }): Promise<QortexResetResult | null> {
+    if (!this.isAvailable) return null;
+    try {
+      return (await this.connection.callTool(
+        "qortex_learning_reset",
+        {
+          learner: this.learnerName,
+          arm_ids: opts?.arm_ids ?? null,
+        },
+        { timeout: OBSERVE_TIMEOUT_MS },
+      )) as QortexResetResult;
+    } catch (err) {
+      this.warnOnce("reset", `qortex learning reset failed: ${String(err)}`);
       return null;
     }
   }

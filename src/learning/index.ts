@@ -34,6 +34,7 @@ export type {
   QortexArmState,
   QortexMetricsResult,
   QortexPosteriorsResult,
+  QortexResetResult,
   QortexSelectResult,
 } from "./qortex-client.js";
 

@@ -357,6 +357,62 @@ describe("QortexLearningClient", () => {
     });
   });
 
+  describe("reset()", () => {
+    it("calls qortex_learning_reset with all arms when no arm_ids", async () => {
+      const mockResult = {
+        learner: "openclaw",
+        reset_count: 5,
+        arm_ids: ["a", "b", "c", "d", "e"],
+      };
+      const conn = mockConnection({
+        callTool: vi.fn(async () => mockResult),
+      });
+      const client = new QortexLearningClient(conn, "openclaw");
+
+      const result = await client.reset();
+
+      expect(conn.callTool).toHaveBeenCalledWith(
+        "qortex_learning_reset",
+        { learner: "openclaw", arm_ids: null },
+        { timeout: expect.any(Number) },
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it("calls qortex_learning_reset with specific arm_ids", async () => {
+      const mockResult = { learner: "openclaw", reset_count: 2, arm_ids: ["a", "b"] };
+      const conn = mockConnection({
+        callTool: vi.fn(async () => mockResult),
+      });
+      const client = new QortexLearningClient(conn);
+
+      const result = await client.reset({ arm_ids: ["a", "b"] });
+
+      expect(conn.callTool).toHaveBeenCalledWith(
+        "qortex_learning_reset",
+        { learner: "openclaw", arm_ids: ["a", "b"] },
+        { timeout: expect.any(Number) },
+      );
+      expect(result).toEqual(mockResult);
+    });
+
+    it("returns null when connection unavailable", async () => {
+      const conn = mockConnection({ isConnected: false });
+      const client = new QortexLearningClient(conn);
+      expect(await client.reset()).toBeNull();
+    });
+
+    it("returns null when callTool throws", async () => {
+      const conn = mockConnection({
+        callTool: vi.fn(async () => {
+          throw new Error("reset failed");
+        }),
+      });
+      const client = new QortexLearningClient(conn);
+      expect(await client.reset()).toBeNull();
+    });
+  });
+
   describe("sessionStart()", () => {
     it("calls qortex_learning_session_start", async () => {
       const conn = mockConnection({
