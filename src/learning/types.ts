@@ -82,6 +82,11 @@ export type LearningConfig = {
   baselineRate?: number;
   /** Arms with fewer than N pulls are always included. */
   minPulls?: number;
+  /** Arm IDs initialized with a boosted prior so they're never starved out.
+   *  Defaults to CRITICAL_SEED_ARMS if unset. */
+  seedArms?: string[];
+  /** Alpha prior for seed arms. Default 2.0 → Beta(2,1) ≈ 67% mean. */
+  seedBoost?: number;
   /** Qortex learning backend configuration. */
   qortex?: {
     /** Command to spawn qortex MCP server. Default: "uvx qortex mcp-serve". */
@@ -90,6 +95,24 @@ export type LearningConfig = {
   /** Learner name in qortex. Default: "openclaw". */
   learnerName?: string;
 };
+
+/**
+ * Tools that must always be available to the agent.
+ * Initialized with boosted priors so the bandit never starves them out.
+ */
+export const CRITICAL_SEED_ARMS: string[] = [
+  // Core filesystem
+  "tool:fs:Read",
+  "tool:fs:Edit",
+  "tool:fs:Write",
+  "tool:fs:Glob",
+  "tool:fs:Grep",
+  // Execution
+  "tool:exec:Bash",
+  // Web
+  "tool:web:web_search",
+  "tool:web:WebFetch",
+];
 
 // -- Parsing helpers --
 

@@ -161,28 +161,34 @@ export class QortexLearningClient {
       k?: number;
       /** Arms with fewer than N pulls are always included (exploration floor). */
       min_pulls?: number;
+      /** Arm IDs to initialize with boosted priors. Only applied on first learner creation. */
+      seed_arms?: string[];
+      /** Alpha prior for seed arms. Default 2.0 → Beta(2,1). */
+      seed_boost?: number;
     },
   ): Promise<QortexSelectResult> {
     if (!this.isAvailable) {
       return this.fallbackSelectAll(candidates, opts?.token_budget);
     }
     try {
-      const result = (await this.connection.callTool(
-        "qortex_learning_select",
-        {
-          learner: this.learnerName,
-          candidates: candidates.map((c) => ({
-            id: c.id,
-            metadata: c.metadata ?? {},
-            token_cost: c.token_cost ?? 0,
-          })),
-          context: opts?.context ?? null,
-          k: opts?.k ?? 0, // 0 = select as many as budget allows
-          token_budget: opts?.token_budget ?? 0,
-          min_pulls: opts?.min_pulls ?? 0,
-        },
-        { timeout: SELECT_TIMEOUT_MS },
-      )) as QortexSelectResult;
+      const params: Record<string, unknown> = {
+        learner: this.learnerName,
+        candidates: candidates.map((c) => ({
+          id: c.id,
+          metadata: c.metadata ?? {},
+          token_cost: c.token_cost ?? 0,
+        })),
+        context: opts?.context ?? null,
+        k: opts?.k ?? 0,
+        token_budget: opts?.token_budget ?? 0,
+        min_pulls: opts?.min_pulls ?? 0,
+      };
+      if (opts?.seed_arms?.length) params.seed_arms = opts.seed_arms;
+      if (opts?.seed_boost != null) params.seed_boost = opts.seed_boost;
+
+      const result = (await this.connection.callTool("qortex_learning_select", params, {
+        timeout: SELECT_TIMEOUT_MS,
+      })) as QortexSelectResult;
       // Normalize: qortex returns Arm objects, we need string IDs downstream
       result.selected_arms = result.selected_arms.map(toArmId);
       result.excluded_arms = result.excluded_arms.map(toArmId);

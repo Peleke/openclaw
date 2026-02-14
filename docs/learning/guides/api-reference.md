@@ -8,7 +8,7 @@ The Learning module exposes a JSON API through the gateway HTTP server.
 http://localhost:18789/__openclaw__/api/learning/
 ```
 
-All endpoints accept `GET` requests only. CORS is enabled via `Access-Control-Allow-Origin` (default `*`, configurable with `OPENCLAW_CORS_ORIGIN` environment variable).
+Most endpoints accept `GET` requests. The `/reset` and `/reward` endpoints accept `POST`. CORS is enabled via `Access-Control-Allow-Origin` (default `*`, configurable with `OPENCLAW_CORS_ORIGIN` environment variable).
 
 ## Endpoints
 
@@ -23,6 +23,81 @@ curl http://localhost:18789/__openclaw__/api/learning/dashboard
 **Response:** HTML page (Content-Type: `text/html`).
 
 This endpoint does not require the learning database — the HTML is generated on-the-fly and fetches data from the other API endpoints client-side.
+
+### `POST /reset`
+
+Reset all arm posteriors back to uninformative priors Beta(1,1). Optionally reset only specific arms.
+
+```bash
+# Reset all arms
+curl -X POST http://localhost:18789/__openclaw__/api/learning/reset
+
+# Reset specific arms only
+curl -X POST http://localhost:18789/__openclaw__/api/learning/reset \
+  -H "Content-Type: application/json" \
+  -d '{"arm_ids": ["tool:web:web_search", "skill:coding:main"]}'
+```
+
+**Request body (optional):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `arm_ids` | string[] | Specific arms to reset (omit to reset all) |
+
+**Response:**
+
+```json
+{
+  "learner": "openclaw",
+  "reset_count": 18,
+  "arm_ids": ["tool:fs:Read", "tool:exec:Bash", "..."]
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `learner` | string | Learner name in qortex |
+| `reset_count` | number | Number of arms that were reset |
+| `arm_ids` | string[] | IDs of the reset arms |
+
+### `POST /reward`
+
+Manually submit a reward observation for a specific arm. Useful for lagged or deferred feedback that could not be captured automatically.
+
+```bash
+# Record a positive reward (accepted)
+curl -X POST http://localhost:18789/__openclaw__/api/learning/reward \
+  -H "Content-Type: application/json" \
+  -d '{"arm_id": "tool:web:web_search", "outcome": "accepted", "reward": 1.0}'
+
+# Record a negative reward (rejected)
+curl -X POST http://localhost:18789/__openclaw__/api/learning/reward \
+  -H "Content-Type: application/json" \
+  -d '{"arm_id": "tool:web:web_search", "outcome": "rejected", "reward": 0.0}'
+```
+
+**Request body:**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `arm_id` | string | Yes | Full arm ID (e.g., `tool:web:web_search`) |
+| `outcome` | string | No | `"accepted"` or `"rejected"` (default: `"accepted"`) |
+| `reward` | number | No | Reward value; defaults to `1.0` for accepted, `0.0` for rejected |
+| `reason` | string | No | Human-readable reason for the observation |
+
+**Response:**
+
+```json
+{
+  "ok": true,
+  "arm_id": "tool:web:web_search"
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `ok` | boolean | Whether the reward was recorded |
+| `arm_id` | string | The arm that received the reward |
 
 ### `GET /summary`
 
@@ -245,9 +320,12 @@ curl "http://localhost:18789/__openclaw__/api/learning/timeseries?metric=converg
 
 | Status | Body | Cause |
 |--------|------|-------|
+| `400` | `{"error": "arm_id (string) is required"}` | Missing `arm_id` on `/reward` |
 | `404` | `{"error": "Unknown learning API route"}` | Invalid route |
-| `405` | `Method Not Allowed` | Non-GET request |
-| `503` | `{"error": "Learning DB not available"}` | Database not initialized |
+| `405` | `Method Not Allowed` | Wrong HTTP method for route |
+| `503` | `{"error": "Learning backend (qortex) not available"}` | Qortex backend not reachable |
+| `503` | `{"error": "Reset failed ..."}` | Reset operation failed |
+| `503` | `{"error": "Reward observation failed ..."}` | Reward observation failed |
 
 ## Next Steps
 

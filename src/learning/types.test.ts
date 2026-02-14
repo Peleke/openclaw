@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseArmId, buildArmId } from "./types.js";
+import { parseArmId, buildArmId, CRITICAL_SEED_ARMS } from "./types.js";
 
 describe("parseArmId", () => {
   it("parses a valid tool arm ID", () => {
@@ -30,6 +30,21 @@ describe("parseArmId", () => {
 
   it("returns null for empty category or id", () => {
     expect(parseArmId("tool::bash")).toBeNull();
+  });
+});
+
+describe("CRITICAL_SEED_ARMS", () => {
+  it("contains only valid parseable arm IDs", () => {
+    for (const armId of CRITICAL_SEED_ARMS) {
+      const parsed = parseArmId(armId);
+      expect(parsed, `"${armId}" should be a valid arm ID`).not.toBeNull();
+    }
+  });
+
+  it("includes core filesystem and execution tools", () => {
+    expect(CRITICAL_SEED_ARMS).toContain("tool:fs:Read");
+    expect(CRITICAL_SEED_ARMS).toContain("tool:exec:Bash");
+    expect(CRITICAL_SEED_ARMS).toContain("tool:web:web_search");
   });
 });
 

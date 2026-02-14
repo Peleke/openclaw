@@ -101,6 +101,57 @@ describe("QortexLearningClient", () => {
       );
     });
 
+    it("includes seed_arms and seed_boost in callTool params when provided", async () => {
+      const conn = mockConnection({
+        callTool: vi.fn(async () => ({
+          selected_arms: ["a"],
+          excluded_arms: [],
+          is_baseline: false,
+          scores: {},
+          token_budget: 5000,
+          used_tokens: 100,
+        })),
+      });
+      const client = new QortexLearningClient(conn, "test");
+
+      await client.select([{ id: "a", token_cost: 100 }], {
+        token_budget: 5000,
+        seed_arms: ["tool:fs:Read", "tool:exec:Bash"],
+        seed_boost: 3.0,
+      });
+
+      expect(conn.callTool).toHaveBeenCalledWith(
+        "qortex_learning_select",
+        expect.objectContaining({
+          seed_arms: ["tool:fs:Read", "tool:exec:Bash"],
+          seed_boost: 3.0,
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it("omits seed_arms and seed_boost from params when not provided", async () => {
+      const conn = mockConnection({
+        callTool: vi.fn(async () => ({
+          selected_arms: ["a"],
+          excluded_arms: [],
+          is_baseline: false,
+          scores: {},
+          token_budget: 5000,
+          used_tokens: 100,
+        })),
+      });
+      const client = new QortexLearningClient(conn, "test");
+
+      await client.select([{ id: "a", token_cost: 100 }], {
+        token_budget: 5000,
+      });
+
+      const callArgs = vi.mocked(conn.callTool).mock.calls[0][1] as Record<string, unknown>;
+      expect(callArgs).not.toHaveProperty("seed_arms");
+      expect(callArgs).not.toHaveProperty("seed_boost");
+    });
+
     it("forwards min_pulls to qortex_learning_select", async () => {
       const conn = mockConnection({
         callTool: vi.fn(async () => ({
