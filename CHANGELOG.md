@@ -2,6 +2,17 @@
 
 Docs: https://docs.openclaw.ai
 
+## 2026.2.14
+
+### Fixes
+- Learning: prevent bandit self-poisoning on conversational turns — skip observation when no real tools are used, so "hello" messages don't collapse all posteriors. (#88)
+- Learning: add `/learning reset` and `/learning reward` slash commands + API endpoints for manual posterior control. (#88)
+- TUI: show error text from `result.details` when tool results have no content blocks, instead of displaying an empty message. (#88)
+
+### Changes
+- Learning: seed critical tools (Read, Edit, Write, Glob, Grep, Bash, web_search, WebFetch) with biased priors `Beta(2,1)` so the bandit never starves them out. Configurable via `seedArms`/`seedBoost` in `LearningConfig`. (#85)
+- Docs: document reset/reward API endpoints, CLI commands, and the three-tier observation model.
+
 ## 2026.2.13
 
 ### Changes
