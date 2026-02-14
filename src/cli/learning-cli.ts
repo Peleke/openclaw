@@ -55,6 +55,39 @@ export function registerLearningCli(program: Command) {
     });
 
   learning
+    .command("reset")
+    .description("Reset arm posteriors to uninformative priors Beta(1,1)")
+    .option("--host <host>", "Gateway host override")
+    .option("--port <port>", "Gateway port override")
+    .option("--confirm", "Skip confirmation prompt")
+    .action(async (opts: { host?: string; port?: string; confirm?: boolean }) => {
+      if (!opts.confirm) {
+        const { confirm } = await import("@clack/prompts");
+        const ok = await confirm({ message: "Reset all arm posteriors to Beta(1,1)?" });
+        if (!ok || typeof ok === "symbol") {
+          console.log("Cancelled.");
+          return;
+        }
+      }
+
+      // Try gateway API first
+      const { postGatewayJson } = await import("../infra/gateway-http.js");
+      const apiOpts = { host: opts.host, port: opts.port };
+      const result = await postGatewayJson<{
+        learner: string;
+        reset_count: number;
+        arm_ids: string[];
+      }>("/__openclaw__/api/learning", "/reset", {}, apiOpts);
+      if (result) {
+        console.log(`Reset ${result.reset_count} arm(s) for learner "${result.learner}".`);
+        return;
+      }
+
+      console.error("Reset failed — gateway not reachable or qortex unavailable.");
+      process.exitCode = 1;
+    });
+
+  learning
     .command("dashboard")
     .description("Open the learning dashboard (served by gateway)")
     .option("--host <host>", "Gateway host override")

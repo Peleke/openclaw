@@ -49,6 +49,12 @@ export function generateLearningDashboardHtml(opts: { apiBase: string }): string
   .ci-fill { height: 100%; border-radius: 4px; background: #FF5A2D; position: absolute; }
   .ci-marker { position: absolute; width: 2px; height: 12px; background: #fff; top: -2px; }
   canvas { width: 100% !important; }
+  .btn-reset { background: #E23D2D; color: #fff; border: none; padding: 6px 16px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; font-weight: bold; }
+  .btn-reset:hover { background: #c72a1a; }
+  .btn-reset:disabled { opacity: 0.5; cursor: not-allowed; }
+  .reward-btn { background: none; border: none; cursor: pointer; font-size: 1rem; padding: 2px 4px; opacity: 0.6; transition: opacity 0.15s; }
+  .reward-btn:hover { opacity: 1; }
+  .reward-btn:disabled { opacity: 0.3; cursor: not-allowed; }
   @media (max-width: 768px) { .charts { grid-template-columns: 1fr; } }
 </style>
 </head>
@@ -56,6 +62,7 @@ export function generateLearningDashboardHtml(opts: { apiBase: string }): string
 <div class="header">
   <h1>Learning Dashboard</h1>
   <span id="modeBadge" class="mode-badge mode-passive">Passive</span>
+  <button class="btn-reset" id="resetBtn" onclick="resetAllArms()">Reset All Arms</button>
 </div>
 <p class="subtitle">Auto-refreshes every 30s | <span id="configInfo"></span></p>
 
@@ -104,6 +111,7 @@ export function generateLearningDashboardHtml(opts: { apiBase: string }): string
         <th>Credible Interval (95%)</th>
         <th>Pulls</th>
         <th>Confidence</th>
+        <th>Feedback</th>
       </tr>
     </thead>
     <tbody id="posteriorsBody"></tbody>
@@ -117,6 +125,10 @@ let convergenceChart, tokensChart, baselineChart, runDistChart;
 async function fetchJson(path) {
   const res = await fetch(API + path);
   return res.json();
+}
+
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function renderConfig(config) {
@@ -299,7 +311,7 @@ function renderRunDist(baseline) {
 function renderPosteriors(posteriors) {
   const tbody = document.getElementById('posteriorsBody');
   if (!posteriors || posteriors.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" style="color:#8B7F77">No posteriors yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" style="color:#8B7F77">No posteriors yet</td></tr>';
     return;
   }
 
@@ -314,14 +326,20 @@ function renderPosteriors(posteriors) {
     if (p.isUnderexplored) badges += '<span class="arm-badge badge-underexplored">EXPLORE</span>';
 
     const confColor = p.confidence === 'high' ? '#2FBF71' : p.confidence === 'medium' ? '#FFB020' : '#E23D2D';
+    const safeId = escHtml(p.armId).replace(/'/g, "\\\\'");
+    const displayId = escHtml(p.armId);
 
     return '<tr>' +
-      '<td>' + p.armId + badges + '</td>' +
+      '<td>' + displayId + badges + '</td>' +
       '<td>' + p.mean.toFixed(3) + '</td>' +
       '<td><div class="ci-bar" style="width:80px"><div class="ci-fill" style="left:' + ciLeft + '%;width:' + ciWidth + '%"></div><div class="ci-marker" style="left:' + meanPos + '%"></div></div> ' +
         '<span style="font-size:0.7rem;color:#8B7F77">[' + ci.lower.toFixed(2) + ', ' + ci.upper.toFixed(2) + ']</span></td>' +
       '<td>' + p.pulls + '</td>' +
       '<td style="color:' + confColor + '">' + (p.confidence || 'low') + '</td>' +
+      '<td>' +
+        '<button class="reward-btn" title="Good" onclick="rewardArm(\\'' + safeId + '\\', 1)">&#x1F44D;</button>' +
+        '<button class="reward-btn" title="Bad" onclick="rewardArm(\\'' + safeId + '\\', 0)">&#x1F44E;</button>' +
+      '</td>' +
     '</tr>';
   }).join('');
 }
@@ -376,6 +394,42 @@ function renderHeatmap(posteriors, traces) {
       ctx.fillRect(x, y, cellW - 1, cellH - 1);
     });
   });
+}
+
+async function resetAllArms() {
+  if (!confirm('Reset ALL arm posteriors to Beta(1,1)? This cannot be undone.')) return;
+  const btn = document.getElementById('resetBtn');
+  btn.disabled = true;
+  btn.textContent = 'Resetting...';
+  try {
+    const res = await fetch(API + '/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+    const data = await res.json();
+    if (res.ok) {
+      btn.textContent = 'Reset ' + data.reset_count + ' arms';
+      setTimeout(() => { btn.textContent = 'Reset All Arms'; btn.disabled = false; }, 2000);
+      refresh();
+    } else {
+      btn.textContent = 'Failed';
+      setTimeout(() => { btn.textContent = 'Reset All Arms'; btn.disabled = false; }, 2000);
+    }
+  } catch (err) {
+    btn.textContent = 'Error';
+    setTimeout(() => { btn.textContent = 'Reset All Arms'; btn.disabled = false; }, 2000);
+  }
+}
+
+async function rewardArm(armId, reward) {
+  const outcome = reward > 0 ? 'accepted' : 'rejected';
+  try {
+    const res = await fetch(API + '/reward', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ arm_id: armId, outcome, reward, reason: 'dashboard feedback' }),
+    });
+    if (res.ok) refresh();
+  } catch (err) {
+    console.error('Reward failed:', err);
+  }
 }
 
 async function refresh() {

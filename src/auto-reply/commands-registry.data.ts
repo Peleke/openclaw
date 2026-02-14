@@ -554,6 +554,39 @@ function buildChatCommands(): ChatCommandDefinition[] {
       formatArgs: COMMAND_ARG_FORMATTERS.queue,
     }),
     defineChatCommand({
+      key: "learning",
+      nativeName: "learning",
+      description: "Learning layer controls (reset, reward, status).",
+      textAlias: "/learning",
+      category: "management",
+      args: [
+        {
+          name: "action",
+          description: "reset, reward, or status",
+          type: "string",
+          choices: [
+            { value: "reset", label: "Reset" },
+            { value: "reward", label: "Reward" },
+            { value: "status", label: "Status" },
+          ],
+        },
+        {
+          name: "target",
+          description: "Arm ID or label (for reward)",
+          type: "string",
+          captureRemaining: true,
+        },
+      ],
+      argsMenu: {
+        arg: "action",
+        title:
+          "Learning Actions:\n" +
+          "• Reset – Reset all arm posteriors to Beta(1,1)\n" +
+          "• Reward – Record lagged reward for an arm\n" +
+          "• Status – Show learning layer summary",
+      },
+    }),
+    defineChatCommand({
       key: "bash",
       description: "Run host shell commands (host-only).",
       textAlias: "/bash",

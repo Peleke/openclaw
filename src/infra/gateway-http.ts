@@ -43,3 +43,37 @@ export async function fetchGatewayJson<T>(
     return null;
   }
 }
+
+/**
+ * POST JSON to a gateway API path.
+ * @returns Parsed JSON response or null on any failure
+ */
+export async function postGatewayJson<T>(
+  apiPrefix: string,
+  route: string,
+  body?: Record<string, unknown>,
+  opts?: FetchGatewayJsonOpts,
+): Promise<T | null> {
+  const base = resolveGatewayUrl(opts);
+  const url = new URL(`${apiPrefix}${route}`, base).href;
+  const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
+      });
+      if (!res.ok) return null;
+      return (await res.json()) as T;
+    } finally {
+      clearTimeout(timer);
+    }
+  } catch {
+    return null;
+  }
+}

@@ -29,7 +29,8 @@ function formatArgs(toolName: string, args: unknown): string {
   }
 }
 
-function extractText(result?: ToolResult): string {
+/** Extract displayable text from tool result content blocks. */
+export function extractText(result?: ToolResult): string {
   if (!result?.content) return "";
   const lines: string[] = [];
   for (const entry of result.content) {
@@ -43,6 +44,17 @@ function extractText(result?: ToolResult): string {
     }
   }
   return lines.join("\n").trim();
+}
+
+/** Pull an error message from result.details (status/error/message/reason). */
+export function extractErrorText(result?: ToolResult): string {
+  const details = result?.details;
+  if (!details || typeof details !== "object") return "";
+  for (const key of ["error", "message", "reason"] as const) {
+    const val = (details as Record<string, unknown>)[key];
+    if (typeof val === "string" && val.trim()) return val.trim();
+  }
+  return "";
 }
 
 export class ToolExecutionComponent extends Container {
@@ -117,7 +129,8 @@ export class ToolExecutionComponent extends Container {
     this.argsLine.setText(argLine ? theme.dim(argLine) : theme.dim(" "));
 
     const raw = extractText(this.result);
-    const text = raw || (this.isPartial ? "…" : "");
+    const errorFallback = !raw && this.isError ? extractErrorText(this.result) : "";
+    const text = raw || errorFallback || (this.isPartial ? "…" : "");
     if (!this.expanded && text) {
       const lines = text.split("\n");
       const preview =

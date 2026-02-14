@@ -190,10 +190,20 @@ function includeAll(params: {
 // ── Post-run observation ────────────────────────────────────────────
 
 /**
+ * Meta-tools that don't count as "real" tool usage for observation purposes.
+ * The agent delivering a text reply via "message" is not a tool-selection signal.
+ */
+const META_TOOLS = new Set(["message"]);
+
+/**
  * Observe outcomes for all arms in a completed run.
  *
- * For each arm that was included in the run, detects whether it was
- * referenced in the assistant's output and reports the outcome to qortex.
+ * Three-tier observation logic:
+ * 1. If no real tools were used (conversational turn) → skip entirely.
+ *    Prevents bandit self-poisoning: "hello" messages shouldn't punish all arms.
+ * 2. If real tools were used → referenced arms get accepted (1.0),
+ *    unreferenced arms get rejected (0.0).
+ * 3. In passive phase → skip (existing behavior).
  *
  * Runs on fire-and-forget — errors are swallowed.
  */
@@ -209,6 +219,17 @@ export async function observeRunOutcomes(params: {
 
   // Only observe in active phase
   if (config.phase !== "active") return;
+
+  // Three-tier guard: skip observation on conversational turns.
+  // If the agent only replied with text (no real tools), this is a non-event —
+  // not a signal that any tool should be penalized.
+  const anyRealToolUsed = toolMetas.some((tm) => !META_TOOLS.has(tm.toolName));
+  if (!anyRealToolUsed) {
+    log.debug(
+      `learning: skipping observation — conversational turn (${selection.selectedArms.length} arms, ${toolMetas.length} meta-tools)`,
+    );
+    return;
+  }
 
   const qortexContext: Record<string, unknown> = { ...params.context };
   if (config.phase) qortexContext.phase = config.phase;

@@ -18,6 +18,38 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+const MAX_BODY_BYTES = 64 * 1024; // 64KB limit for JSON request bodies
+
+/** Read and parse a JSON request body. Returns null on failure, empty body, or oversized body. */
+function readJsonBody(req: IncomingMessage): Promise<Record<string, unknown> | null> {
+  return new Promise((resolve) => {
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    req.on("data", (chunk: Buffer) => {
+      totalBytes += chunk.length;
+      if (totalBytes > MAX_BODY_BYTES) {
+        req.destroy();
+        resolve(null);
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on("end", () => {
+      if (chunks.length === 0) {
+        resolve(null);
+        return;
+      }
+      try {
+        const parsed = JSON.parse(Buffer.concat(chunks).toString("utf-8"));
+        resolve(typeof parsed === "object" && parsed !== null ? parsed : null);
+      } catch {
+        resolve(null);
+      }
+    });
+    req.on("error", () => resolve(null));
+  });
+}
+
 function parseUrl(req: IncomingMessage): URL | null {
   try {
     return new URL(req.url ?? "/", "http://localhost");
@@ -60,6 +92,64 @@ export function createLearningApiHandler(opts: {
       sendJson(res, 503, { error: "Learning backend (qortex) not available" });
       return true;
     }
+
+    // ── POST routes ───────────────────────────────────────────────
+    // Auth note: gateway bind mode (--bind lan/loopback) restricts network access.
+    // Chat command layer adds isAuthorizedSender checks for messaging surfaces.
+
+    if (route === "reset") {
+      if (req.method !== "POST") {
+        res.statusCode = 405;
+        res.setHeader("Allow", "POST");
+        res.end("Method Not Allowed");
+        return true;
+      }
+      const body = await readJsonBody(req);
+      const armIds = Array.isArray(body?.arm_ids) ? (body.arm_ids as string[]) : undefined;
+      const result = await client.reset(armIds ? { arm_ids: armIds } : undefined);
+      if (!result) {
+        sendJson(res, 503, { error: "Reset failed — qortex backend error" });
+        return true;
+      }
+      sendJson(res, 200, result);
+      return true;
+    }
+
+    if (route === "reward") {
+      if (req.method !== "POST") {
+        res.statusCode = 405;
+        res.setHeader("Allow", "POST");
+        res.end("Method Not Allowed");
+        return true;
+      }
+      const body = await readJsonBody(req);
+      if (!body?.arm_id || typeof body.arm_id !== "string") {
+        sendJson(res, 400, { error: "arm_id (string) is required" });
+        return true;
+      }
+      const armId = body.arm_id as string;
+      const outcome = (body.outcome as string) ?? "accepted";
+      const reward =
+        typeof body.reward === "number"
+          ? (body.reward as number)
+          : outcome === "accepted"
+            ? 1.0
+            : 0.0;
+      const reason = typeof body.reason === "string" ? (body.reason as string) : undefined;
+
+      const result = await client.observe(armId, outcome, {
+        reward,
+        context: { lagged: true, ...(reason ? { reason } : {}) },
+      });
+      if (!result) {
+        sendJson(res, 503, { error: "Reward observation failed — qortex backend error" });
+        return true;
+      }
+      sendJson(res, 200, { ...result, ok: true, arm_id: armId });
+      return true;
+    }
+
+    // ── GET routes ────────────────────────────────────────────────
 
     if (req.method !== "GET") {
       res.statusCode = 405;
