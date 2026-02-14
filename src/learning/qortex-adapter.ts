@@ -14,7 +14,7 @@ import type { AgentTool } from "@mariozechner/pi-agent-core";
 import { QortexLearningClient, type QortexArm, type QortexSelectResult } from "./qortex-client.js";
 import { detectReference } from "./reference-detection.js";
 import type { ArmId, ArmType, LearningConfig, SelectionContext, SelectionResult } from "./types.js";
-import { buildArmId } from "./types.js";
+import { buildArmId, CRITICAL_SEED_ARMS } from "./types.js";
 import { log } from "./logger.js";
 import { QortexMcpConnection, parseCommandString } from "../qortex/connection.js";
 import type { QortexConnection } from "../qortex/connection.js";
@@ -108,10 +108,14 @@ export async function selectViaQortex(params: {
   if (context.model) qortexContext.model = context.model;
   if (config.phase) qortexContext.phase = config.phase;
 
+  const seedArms = config.seedArms ?? CRITICAL_SEED_ARMS;
+
   const result = await client.select(candidates, {
     token_budget: tokenBudget,
     context: qortexContext,
     min_pulls: config.minPulls,
+    seed_arms: seedArms,
+    seed_boost: config.seedBoost,
   });
 
   if (!result) {

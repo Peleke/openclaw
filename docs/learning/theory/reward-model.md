@@ -14,17 +14,71 @@ After each run, the learning layer checks whether each included arm was actually
 | `memory` | Substring (20+ chars) of content in output | Output contains memory snippet → memory arm is referenced |
 | `section` | Always referenced when included | Structural sections are always "used" |
 
-## Reward Values
+## Three-Tier Observation Guard
 
-| Outcome | Reward | Posterior Update |
-|---------|--------|-----------------|
-| Included + referenced | `1.0` | `alpha += 1` (success) |
-| Included + not referenced | `0.0` | `beta += 1` (failure) |
-| Excluded | — | No update (counterfactual not observed) |
+Before any reward is recorded, the observation logic applies a three-tier guard to prevent bandit self-poisoning on conversational turns. This is critical because many agent interactions are simple text exchanges where no tools are invoked.
 
-Only included arms receive updates. Excluded arms have no observed outcome, so their posteriors remain unchanged. This is a key property — the system doesn't penalize arms it chose not to include.
+### Tier 1: Skip Conversational Turns
+
+If the agent only replied with text and did not invoke any real tools, the entire observation is **skipped**. No arms receive updates.
+
+Why: a "hello" message should not penalize every tool in the prompt. Without this guard, conversational turns would flood the bandit with false negatives, biasing posteriors downward for all arms.
+
+Meta-tools like `message` (the agent delivering a text reply) do not count as real tool usage.
+
+### Tier 2: Reward Referenced Arms
+
+When real tools were used, each included arm is checked for reference in the assistant output. Referenced arms receive a positive reward (`1.0`, `alpha += 1`).
+
+### Tier 3: Penalize Unreferenced Arms
+
+Included arms that were not referenced in the output receive a negative reward (`0.0`, `beta += 1`). This is the "failure" signal -- the arm was available but the model did not use it.
+
+### Summary Table
+
+| Scenario | Observation | Reward |
+|----------|-------------|--------|
+| Conversational turn (no real tools used) | Skip entirely | None |
+| Included + referenced by output | Accepted | `1.0` (`alpha += 1`) |
+| Included + not referenced by output | Rejected | `0.0` (`beta += 1`) |
+| Excluded from prompt | No update | None (counterfactual) |
+| Passive phase | Skip entirely | None |
+
+Only included arms receive updates. Excluded arms have no observed outcome, so their posteriors remain unchanged. This is a key property -- the system does not penalize arms it chose not to include.
 
 When tools are excluded, the system injects guidance into the model's system prompt listing which tools are unavailable. This allows the model to gracefully explain to users that a capability is temporarily excluded and suggest alternatives, rather than silently producing an empty response.
+
+## Manual Reward
+
+In some cases, automatic reference detection cannot capture the true usefulness of an arm. The `/learning reward` chat command and `POST /reward` API endpoint let you manually submit reward observations.
+
+Use cases for manual reward:
+
+- **Lagged feedback** -- the user judges quality minutes or hours after the response
+- **Domain-specific quality** -- the automatic detector cannot assess correctness in specialized domains
+- **Corrective signals** -- override a false positive/negative from automatic detection
+
+Manual rewards are marked with `lagged: true` in the observation context so they can be distinguished from automatic observations in exports.
+
+See the [Chat Commands guide](../guides/chat-commands) for messaging-surface usage or the [API Reference](../guides/api-reference) for the HTTP endpoint.
+
+## Resetting Posteriors
+
+When posteriors become poisoned or the arm inventory changes significantly, you can reset all arms back to uninformative priors Beta(1,1). This erases all learned data and restarts the bandit from scratch.
+
+Common reasons to reset:
+
+- Major changes to the tool inventory (added/removed many tools)
+- A bug caused incorrect reward signals for an extended period
+- Switching to a different model family that uses tools differently
+- Starting a new project phase with different tool usage patterns
+
+Reset is available via:
+- **CLI:** `openclaw learning reset`
+- **Chat:** `/learning reset`
+- **API:** `POST /__openclaw__/api/learning/reset`
+
+After a reset, all arms return to Beta(1,1) (mean 0.5, zero observations). The bandit re-enters its exploration phase, treating every arm as unknown.
 
 ## Initial Priors
 

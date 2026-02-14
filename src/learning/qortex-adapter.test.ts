@@ -11,6 +11,7 @@ import type { QortexLearningClient, QortexSelectResult } from "./qortex-client.j
 import type { QortexConnection } from "../qortex/connection.js";
 import type { AgentTool } from "@mariozechner/pi-agent-core";
 import type { LearningConfig, SelectionResult } from "./types.js";
+import { CRITICAL_SEED_ARMS } from "./types.js";
 
 // Mock the connection module so withLearningConnection doesn't spawn real processes.
 const mockConnInit = vi.fn(async () => {});
@@ -321,6 +322,85 @@ describe("selectViaQortex()", () => {
     expect(selectFn).toHaveBeenCalledWith(
       expect.any(Array),
       expect.objectContaining({ min_pulls: undefined }),
+    );
+  });
+
+  it("passes default CRITICAL_SEED_ARMS when config has no seedArms", async () => {
+    const selectFn = vi.fn(async () => ({
+      selected_arms: [],
+      excluded_arms: [],
+      is_baseline: true,
+      scores: {},
+      token_budget: 8000,
+      used_tokens: 0,
+    }));
+    const client = mockClient({ select: selectFn });
+
+    await selectViaQortex({
+      client,
+      config: baseConfig,
+      tools: [],
+      skillEntries: [],
+      contextFiles: [],
+      context: {},
+    });
+
+    expect(selectFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ seed_arms: CRITICAL_SEED_ARMS }),
+    );
+  });
+
+  it("passes custom seedArms from config", async () => {
+    const selectFn = vi.fn(async () => ({
+      selected_arms: [],
+      excluded_arms: [],
+      is_baseline: true,
+      scores: {},
+      token_budget: 8000,
+      used_tokens: 0,
+    }));
+    const client = mockClient({ select: selectFn });
+
+    const customSeeds = ["tool:exec:bash", "tool:web:web_search"];
+    await selectViaQortex({
+      client,
+      config: { ...baseConfig, seedArms: customSeeds },
+      tools: [],
+      skillEntries: [],
+      contextFiles: [],
+      context: {},
+    });
+
+    expect(selectFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ seed_arms: customSeeds }),
+    );
+  });
+
+  it("passes seedBoost from config", async () => {
+    const selectFn = vi.fn(async () => ({
+      selected_arms: [],
+      excluded_arms: [],
+      is_baseline: true,
+      scores: {},
+      token_budget: 8000,
+      used_tokens: 0,
+    }));
+    const client = mockClient({ select: selectFn });
+
+    await selectViaQortex({
+      client,
+      config: { ...baseConfig, seedBoost: 5.0 },
+      tools: [],
+      skillEntries: [],
+      contextFiles: [],
+      context: {},
+    });
+
+    expect(selectFn).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ seed_boost: 5.0 }),
     );
   });
 

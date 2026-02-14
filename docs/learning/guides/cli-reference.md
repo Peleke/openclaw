@@ -66,6 +66,43 @@ Bottom Arms (candidates for exclusion)
   memory:project:draft-spec    0.312       12    1/27/2025
 ```
 
+### `learning reset`
+
+Reset all arm posteriors back to uninformative priors Beta(1,1).
+
+```bash
+openclaw learning reset [--host <host>] [--port <port>] [--confirm]
+```
+
+This is a destructive operation -- all learned data is lost. The bandit starts fresh as if no observations had been recorded. Use this when:
+
+- You have significantly changed your tool inventory or skills
+- Poisoned data has skewed posteriors (e.g., a bug caused incorrect reward signals)
+- You want to re-run the learning phase from scratch after a major config change
+
+**Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--host` | `127.0.0.1` | Gateway host (or set `OPENCLAW_GATEWAY_HOST`) |
+| `--port` | `18789` | Gateway port |
+| `--confirm` | — | Skip the confirmation prompt |
+
+Without `--confirm`, you will be prompted to confirm before the reset proceeds.
+
+**Example:**
+
+```bash
+$ openclaw learning reset
+? Reset all arm posteriors to Beta(1,1)? (Y/n) Y
+Reset 18 arm(s) for learner "openclaw".
+```
+
+```bash
+# Non-interactive (CI, scripts)
+openclaw learning reset --confirm
+```
+
 ### `learning export`
 
 Export traces and posteriors to stdout.
@@ -166,6 +203,20 @@ openclaw learning dashboard
 # When ready, switch to active mode in openclaw.json
 # Then monitor token savings
 openclaw learning status
+```
+
+### Resetting After Config Changes
+
+```bash
+# You've added several new tools and removed old ones.
+# Existing posteriors no longer reflect the current inventory.
+
+# Reset all posteriors to Beta(1,1)
+openclaw learning reset --confirm
+
+# Verify the reset
+openclaw learning status
+# Should show 0 traces and all arms at mean 0.500
 ```
 
 ### Remote Gateway
