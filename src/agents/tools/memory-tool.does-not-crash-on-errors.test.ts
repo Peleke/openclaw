@@ -49,7 +49,6 @@ describe("memory tools", () => {
     expect(result.details).toEqual({
       path: "memory/NOPE.md",
       text: "",
-      disabled: true,
       error: "path required",
     });
   });
