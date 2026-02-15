@@ -44,6 +44,7 @@ import {
 import { normalizeUsage, type UsageLike } from "../usage.js";
 
 import { observeRunOutcomes, withLearningConnection } from "../../learning/qortex-adapter.js";
+import { ingestConversationTurn } from "../../qortex/online-ingest.js";
 import { captureAndStoreGreenTrace } from "../../green/trace-capture.js";
 import { compactEmbeddedPiSessionDirect } from "./compact.js";
 import { resolveGlobalLane, resolveSessionLane } from "./lanes.js";
@@ -692,6 +693,17 @@ export async function runEmbeddedPiAgent(
                     model: modelId,
                   },
                 }),
+            });
+          }
+
+          // Online indexing: ingest user message + assistant responses into qortex
+          if (params.qortexConnection?.isConnected) {
+            void ingestConversationTurn({
+              connection: params.qortexConnection,
+              sessionId: params.sessionId,
+              userPrompt: params.prompt,
+              assistantTexts: attempt.assistantTexts,
+              log,
             });
           }
 
