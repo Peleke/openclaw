@@ -58,10 +58,12 @@ export async function ingestConversationTurn(params: IngestTurnParams): Promise<
   if (calls.length === 0) return;
 
   const results = await Promise.allSettled(calls);
-  const failures = results.filter((r) => r.status === "rejected");
+  const failures = results.filter((r): r is PromiseRejectedResult => r.status === "rejected");
   if (failures.length > 0 && log) {
+    const firstReason = failures[0]?.reason;
+    const hint = firstReason instanceof Error ? firstReason.message : String(firstReason ?? "");
     log.debug(
-      `online-ingest: ${failures.length}/${calls.length} calls failed for session=${sessionId}`,
+      `online-ingest: ${failures.length}/${calls.length} calls failed for session=${sessionId}${hint ? ` — ${hint.slice(0, 200)}` : ""}`,
     );
   }
 }
