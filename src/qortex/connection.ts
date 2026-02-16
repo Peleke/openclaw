@@ -21,7 +21,7 @@ const DEFAULT_TOOL_TIMEOUT_MS = 30_000;
 // Env var prefixes to forward to the qortex subprocess.
 // StdioClientTransport only inherits HOME/PATH/USER/etc by default;
 // qortex needs QORTEX_* and OTEL_* for observability, VIRTUAL_ENV for venv.
-const FORWARDED_ENV_PREFIXES = ["QORTEX_", "OTEL_", "VIRTUAL_ENV", "HF_"];
+const FORWARDED_ENV_PREFIXES = ["QORTEX_", "OTEL_", "VIRTUAL_ENV", "HF_", "MEMGRAPH_"];
 
 function collectForwardedEnv(): Record<string, string> {
   const env: Record<string, string> = {};
