@@ -698,11 +698,13 @@ export async function runEmbeddedPiAgent(
 
           // Online indexing: ingest user message + assistant responses into qortex
           if (params.qortexConnection?.isConnected) {
+            const qortexDomains = params.config?.agents?.defaults?.memorySearch?.qortex?.domains;
             void ingestConversationTurn({
               connection: params.qortexConnection,
               sessionId: params.sessionId,
               userPrompt: params.prompt,
               assistantTexts: attempt.assistantTexts,
+              domain: qortexDomains?.[0],
               log,
             });
           }

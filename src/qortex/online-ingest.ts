@@ -26,7 +26,7 @@ type IngestTurnParams = {
  * the conversation flow.
  */
 export async function ingestConversationTurn(params: IngestTurnParams): Promise<void> {
-  const { connection, sessionId, userPrompt, assistantTexts, domain = "session", log } = params;
+  const { connection, sessionId, userPrompt, assistantTexts, domain = "memory/main", log } = params;
 
   if (!connection.isConnected) return;
 
