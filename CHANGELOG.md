@@ -2,6 +2,16 @@
 
 Docs: https://docs.openclaw.ai
 
+## 2026.2.16
+
+### Features
+- Qortex: auto-ingest conversation turns into qortex online index for live knowledge graph crystallization. (#54ce93a)
+- Qortex: forward `HF_*` env vars to qortex subprocess for Hugging Face model access. (#8649804)
+- Qortex: forward `MEMGRAPH_*` env vars to qortex subprocess for graph backend connectivity. (#db50eb8)
+
+### Fixes
+- Qortex: pass configured domain to online ingest instead of hardcoded `"session"` default, so conversation turns index into `memory/main` and are discoverable by `memory_search`. (#9b49ee9)
+
 ## 2026.2.14
 
 ### Fixes
