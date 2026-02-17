@@ -72,3 +72,7 @@ USER.md
 
 # local tooling
 .serena/
+
+# Python wheels (dev artifacts, not versioned)
+*.whl
+
