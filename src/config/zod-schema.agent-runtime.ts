@@ -319,7 +319,15 @@ export const MemorySearchSchema = z
       .optional(),
     qortex: z
       .object({
+        transport: z.enum(["mcp", "http"]).optional(),
         command: z.string().optional(),
+        http: z
+          .object({
+            baseUrl: z.string(),
+            headers: z.record(z.string(), z.string()).optional(),
+          })
+          .strict()
+          .optional(),
         domains: z.array(z.string()).optional(),
         topK: z.number().int().positive().optional(),
         feedback: z.boolean().optional(),

@@ -1,6 +1,6 @@
-site_name: OpenClaw
+site_name: Vindler
 site_url: https://peleke.github.io/openclaw/
-site_description: Opinionated observability layers for AI agents
+site_description: Sandboxed, OTel-instrumented active-learning agent runtime (fork: OpenClaw)
 repo_url: https://github.com/Peleke/openclaw
 repo_name: Peleke/openclaw
 docs_dir: docs

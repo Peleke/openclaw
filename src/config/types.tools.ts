@@ -237,8 +237,12 @@ export type MemorySearchConfig = {
   provider?: "openai" | "gemini" | "local" | "qortex";
   /** qortex-specific configuration (used when provider="qortex"). */
   qortex?: {
-    /** MCP server command (default: "uvx qortex mcp-serve"). */
+    /** Transport type: "mcp" (subprocess) or "http" (REST API). Default: "mcp". */
+    transport?: "mcp" | "http";
+    /** MCP server command (default: "uvx qortex mcp-serve"). Used when transport="mcp". */
     command?: string;
+    /** HTTP connection config. Required when transport="http". */
+    http?: { baseUrl: string; headers?: Record<string, string> };
     /** Override auto-mapped qortex domains. */
     domains?: string[];
     /** Max results per query (default: 10). */

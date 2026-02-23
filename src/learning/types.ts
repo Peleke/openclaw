@@ -89,8 +89,12 @@ export type LearningConfig = {
   seedBoost?: number;
   /** Qortex learning backend configuration. */
   qortex?: {
+    /** Transport type: "mcp" (subprocess) or "http" (REST API). Default: "mcp". */
+    transport?: "mcp" | "http";
     /** Command to spawn qortex MCP server. Default: "uvx qortex mcp-serve". */
     command?: string;
+    /** HTTP connection config. Required when transport="http". */
+    http?: { baseUrl: string; headers?: Record<string, string> };
   };
   /** Learner name in qortex. Default: "openclaw". */
   learnerName?: string;
