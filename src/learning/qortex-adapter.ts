@@ -16,8 +16,9 @@ import { detectReference } from "./reference-detection.js";
 import type { ArmId, ArmType, LearningConfig, SelectionContext, SelectionResult } from "./types.js";
 import { buildArmId, CRITICAL_SEED_ARMS } from "./types.js";
 import { log } from "./logger.js";
-import { QortexMcpConnection, parseCommandString } from "../qortex/connection.js";
-import type { QortexConnection } from "../qortex/connection.js";
+import { parseCommandString } from "../qortex/connection.js";
+import { createQortexConnection } from "../qortex/connection-factory.js";
+import type { QortexConnection } from "../qortex/types.js";
 
 // ── Domain types ────────────────────────────────────────────────────
 
@@ -294,8 +295,15 @@ export async function withLearningConnection<T>(params: {
       conn = sharedConnection;
       ownsConn = false;
     } else {
-      const qortexCmd = learningCfg.qortex?.command ?? "uvx qortex mcp-serve";
-      conn = new QortexMcpConnection(parseCommandString(qortexCmd));
+      const transport = learningCfg.qortex?.transport ?? "mcp";
+      conn = createQortexConnection({
+        transport,
+        mcp:
+          transport === "mcp"
+            ? parseCommandString(learningCfg.qortex?.command ?? "uvx qortex mcp-serve")
+            : undefined,
+        http: transport === "http" ? learningCfg.qortex?.http : undefined,
+      });
       await conn.init();
       ownsConn = true;
     }

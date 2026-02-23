@@ -5,10 +5,10 @@ import { resolveAgentDir, resolveAgentWorkspaceDir } from "../../agents/agent-sc
 import type { OpenClawConfig } from "../../config/config.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
 import {
-  QortexMcpConnection,
   parseCommandString,
   parseToolResult as sharedParseToolResult,
 } from "../../qortex/connection.js";
+import { createQortexConnection } from "../../qortex/connection-factory.js";
 import type { QortexConnection } from "../../qortex/types.js";
 import { listMemoryFiles, buildFileEntry, hashText } from "../internal.js";
 import type { MemorySearchResult } from "../manager.js";
@@ -25,8 +25,10 @@ const log = createSubsystemLogger("qortex-memory");
 // ── Config ──────────────────────────────────────────────────────────────────
 
 export type QortexProviderConfig = {
+  transport?: "mcp" | "http";
   command: string;
   args: string[];
+  http?: { baseUrl: string; headers?: Record<string, string> };
   domains: string[];
   topK: number;
   feedback: boolean;
@@ -127,14 +129,17 @@ export class QortexMemoryProvider implements MemoryProvider {
     return this.connection?.isConnected ?? false;
   }
 
-  /** Spawn the qortex MCP subprocess and perform the initialization handshake. */
+  /** Connect to qortex (MCP subprocess or HTTP endpoint). */
   async init(): Promise<void> {
     // Skip if using shared connection (already initialized)
     if (this.sharedConnection) return;
 
-    this.ownedConnection = new QortexMcpConnection({
-      command: this.config.command,
-      args: this.config.args,
+    const transport = this.config.transport ?? "mcp";
+    this.ownedConnection = createQortexConnection({
+      transport,
+      mcp:
+        transport === "mcp" ? { command: this.config.command, args: this.config.args } : undefined,
+      http: transport === "http" ? this.config.http : undefined,
     });
     await this.ownedConnection.init();
   }
@@ -310,14 +315,25 @@ export class QortexMemoryProvider implements MemoryProvider {
 // ── Config resolution ───────────────────────────────────────────────────────
 
 export function resolveQortexConfig(
-  raw: { command?: string; domains?: string[]; topK?: number; feedback?: boolean } | undefined,
+  raw:
+    | {
+        transport?: "mcp" | "http";
+        command?: string;
+        http?: { baseUrl: string; headers?: Record<string, string> };
+        domains?: string[];
+        topK?: number;
+        feedback?: boolean;
+      }
+    | undefined,
   agentId: string,
 ): QortexProviderConfig {
   const fullCommand = raw?.command ?? `${DEFAULT_COMMAND} ${DEFAULT_ARGS.join(" ")}`;
   const parsed = parseCommandString(fullCommand);
   return {
+    transport: raw?.transport,
     command: parsed.command,
     args: parsed.args,
+    http: raw?.http,
     domains: raw?.domains ?? [`memory/${agentId}`],
     topK: raw?.topK ?? DEFAULT_TOP_K,
     feedback: raw?.feedback ?? true,

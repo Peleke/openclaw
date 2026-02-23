@@ -9,7 +9,15 @@ export const LearningSchema = z
     minPulls: z.number().int().nonnegative().optional(),
     qortex: z
       .object({
+        transport: z.enum(["mcp", "http"]).optional(),
         command: z.string().optional(),
+        http: z
+          .object({
+            baseUrl: z.string(),
+            headers: z.record(z.string(), z.string()).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),
