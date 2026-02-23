@@ -1,18 +1,18 @@
-# OpenClaw
+# Vindler
 
-<p align="center" style="font-size: 4em; margin: 0.5em 0;">
-  <img src="https://raw.githubusercontent.com/openclaw/openclaw/main/docs/assets/openclaw-logo-text.png" alt="OpenClaw" width="360">
+<p align="center" style="font-style: italic; color: #888; margin-bottom: 0.5em;">
+  Sandboxed, OTel-instrumented active-learning agent runtime (fork: <a href="https://github.com/openclaw/openclaw">OpenClaw</a>)
 </p>
 
-<p align="center" style="font-style: italic; color: #888; margin-bottom: 2em;">
-  This is not a fork. It's a claw with opinions.
+<p align="center" style="color: #888; margin-bottom: 0.5em;">
+  Part of the <strong>qlawbox</strong> stack.
 </p>
 
 ---
 
-**OpenClaw** is an opinionated distribution of [openclaw](https://github.com/openclaw/openclaw) — the WhatsApp/Telegram/Discord/iMessage gateway for AI agents.
+**Vindler** is a hardened fork of [OpenClaw](https://github.com/openclaw/openclaw), equipped with [qortex](https://peleke.github.io/qortex/)'s learning layer and sandboxed via [bilrost](https://peleke.github.io/openclaw-sandbox/). It turns a personal AI gateway into an observable, adaptive agent runtime.
 
-This fork adds **observability layers** that make your AI usage accountable, measurable, and improvable:
+Three observability layers run inside the gateway. A hardened VM ([bilrost](https://peleke.github.io/openclaw-sandbox/)) provides process-level isolation. A knowledge graph ([qortex](https://peleke.github.io/qortex/)) provides structured retrieval with adaptive learning.
 
 ## Modules
 
@@ -43,15 +43,26 @@ This fork adds **observability layers** that make your AI usage accountable, mea
 
 ## Why a fork?
 
-Upstream OpenClaw is a great gateway. But we wanted to answer questions it doesn't:
+Upstream OpenClaw is a great gateway. Vindler asks questions it doesn't:
 
 - **How much carbon does my AI usage produce?** (Green)
 - **Which tools actually help the agent?** (Learning)
 - **Can the system prompt get smaller without getting worse?** (Learning)
-- **Can the gateway react to events without being asked?** ([Cadence](https://peleke.github.io/cadence/) — ambient intelligence via signals and responders)
-- **Can we isolate agent execution beyond Docker?** ([OpenClaw Sandbox](https://peleke.github.io/openclaw-sandbox/) — process-level isolation for defense-in-depth around the built-in Docker sandbox)
+- **Can the gateway react to events without being asked?** (Cadence)
+- **Can we isolate agent execution beyond Docker?** ([bilrost](https://peleke.github.io/openclaw-sandbox/))
+- **Can the agent build and query a persistent knowledge graph?** ([qortex](https://peleke.github.io/qortex/))
 
-Green and Learning run as **always-on, zero-config layers** inside the gateway. No opt-in, no setup. Data from the first request. Cadence and Sandbox are companion packages that plug in alongside.
+Green and Learning run as **always-on, zero-config layers** inside the gateway. No opt-in, no setup. Data from the first request. Cadence, bilrost, and qortex plug in alongside.
+
+## The qlawbox stack
+
+Vindler is one component of a larger instrumented agent architecture:
+
+| Component | Role | Docs |
+|-----------|------|------|
+| **vindler** | Agent runtime (this project) | [peleke.github.io/openclaw](https://peleke.github.io/openclaw/) |
+| **[bilrost](https://peleke.github.io/openclaw-sandbox/)** | Hardened Lima VM with OverlayFS, UFW, dual-container Docker isolation | [PyPI](https://pypi.org/project/bilrost/) |
+| **[qortex](https://peleke.github.io/qortex/)** | Knowledge graph with typed edges, adaptive learning, 7 framework adapters | [PyPI](https://pypi.org/project/qortex/) |
 
 ## Quick links
 
@@ -71,10 +82,11 @@ Green and Learning run as **always-on, zero-config layers** inside the gateway. 
 | Cadence quick start | [Wire your first responder](cadence/getting-started/quick-start.md) |
 | Cadence signal reference | [All signal types](cadence/reference/signals.md) |
 | Source | [github.com/Peleke/openclaw](https://github.com/Peleke/openclaw) |
+| bilrost docs | [Hardened VM isolation](https://peleke.github.io/openclaw-sandbox/) |
+| qortex docs | [Knowledge graph](https://peleke.github.io/qortex/) |
 
 ---
 
 <p align="center" style="color: #555; font-size: 0.9em;">
-  Built by <a href="https://github.com/Peleke">Peleke</a> + Claude.
-  Lobster not included.
+  Part of the <strong>qlawbox</strong> stack. Built by <a href="https://github.com/Peleke">Peleke</a> + Claude.
 </p>

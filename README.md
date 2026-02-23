@@ -1,6 +1,8 @@
 # Vindler
 
-**An instrumented agent runtime -- part of the [qlawbox](https://peleke.me/lab) stack.**
+**Sandboxed, OTel-instrumented active-learning agent runtime (fork: [OpenClaw](https://github.com/openclaw/openclaw)).**
+
+Part of the [qlawbox](https://peleke.me/lab) stack.
 
 ---
 
