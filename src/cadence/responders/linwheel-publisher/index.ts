@@ -8,7 +8,7 @@
 
 import crypto from "node:crypto";
 import type { SignalBus } from "@peleke.s/cadence";
-import type { LinWheel } from "@linwheel/sdk";
+import type { LinWheel, PostAngle } from "@linwheel/sdk";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
 import type { OpenClawSignal } from "../../signals.js";
 import type { Responder } from "../index.js";
@@ -80,7 +80,10 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
 
         try {
           // 1. Analyze — get fit score + suggested angles
-          const analysis = await client.analyze({ text: content });
+          const analysis = (await client.analyze({ text: content })) as {
+            linkedinFit?: { score?: number };
+            suggestedAngles?: Array<{ angle?: string; name?: string }>;
+          };
           log.info(`Analyzed ${filePath}`, {
             score: analysis.linkedinFit?.score,
             suggestedAngles: analysis.suggestedAngles?.length,
@@ -89,17 +92,18 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
           // Use suggested angles from analysis if available, fall back to config/frontmatter
           const reshapeAngles =
             analysis.suggestedAngles && analysis.suggestedAngles.length > 0
-              ? analysis.suggestedAngles
-                  .map((a: { angle?: string; name?: string }) => a.angle ?? a.name ?? "")
-                  .filter(Boolean)
+              ? analysis.suggestedAngles.map((a) => a.angle ?? a.name ?? "").filter(Boolean)
               : angles;
 
           // 2. Reshape — generate drafts, save to LinWheel
-          const result = await client.reshape({
+          const finalAngles = (
+            reshapeAngles.length > 0 ? reshapeAngles : config.defaultAngles
+          ) as PostAngle[];
+          const result = (await client.reshape({
             text: content,
-            angles: reshapeAngles.length > 0 ? reshapeAngles : config.defaultAngles,
+            angles: finalAngles,
             saveDrafts: config.saveDrafts,
-          });
+          })) as { posts?: Array<{ text: string; postId?: string }> };
 
           const postCount = result.posts?.length ?? 0;
           log.info(`Generated ${postCount} drafts from ${filePath}`);
