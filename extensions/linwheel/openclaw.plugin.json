@@ -1,0 +1,27 @@
+{
+  "id": "linwheel",
+  "name": "LinWheel",
+  "description": "LinWheel content engine — analyze, reshape, refine, draft, and publish LinkedIn posts with voice-matched style.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "apiKey": {
+        "type": "string",
+        "description": "LinWheel API key. Falls back to LINWHEEL_API_KEY env var."
+      },
+      "signingSecret": {
+        "type": "string",
+        "description": "LinWheel HMAC signing secret. Falls back to LINWHEEL_SIGNING_SECRET env var."
+      },
+      "baseUrl": {
+        "type": "string",
+        "description": "LinWheel API base URL (default: https://www.linwheel.io)."
+      },
+      "timeoutMs": {
+        "type": "number",
+        "description": "Request timeout in milliseconds (default: 60000)."
+      }
+    }
+  }
+}

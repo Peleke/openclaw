@@ -1062,6 +1062,7 @@
           "tools",
           "tools/lobster",
           "tools/llm-task",
+          "tools/linwheel",
           "plugin",
           "plugins/voice-call",
           "plugins/zalouser",

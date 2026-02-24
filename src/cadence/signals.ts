@@ -132,6 +132,13 @@ export type OpenClawPayloadMap = {
     fromInsights: string[];
   };
 
+  /** LinWheel drafts generated from ::linkedin note */
+  "linwheel.drafts.generated": {
+    noteFile: string;
+    postsCreated: number;
+    angles: string[];
+  };
+
   /** Scheduled job fired (cron) */
   "cadence.cron.fired": {
     jobId: string;

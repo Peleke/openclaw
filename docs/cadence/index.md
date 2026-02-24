@@ -18,17 +18,32 @@ Signals flow through a central **bus**. Sources push signals onto the bus; respo
 
 The first shipped pipeline turns journal entries into publishable insights:
 
-```
-Obsidian vault edit
-  → ObsidianWatcher emits obsidian.note.modified
-  → InsightExtractor filters for ::publish marker, debounces, calls LLM
-  → Emits journal.insight.extracted
-  → InsightDigest queues insight, waits for flush conditions
-  → Emits journal.digest.ready
-  → TelegramNotifier formats and delivers digest
-```
+<div style="max-width: 600px; margin: 1rem auto;">
+  <img src="assets/p1-pipeline.svg" alt="P1 Content Pipeline" />
+</div>
 
 You write in Obsidian. Cadence watches, extracts, batches, and delivers — without being asked.
+
+## LinkedIn Pipeline
+
+The LinWheel Publisher turns notes into LinkedIn drafts:
+
+<div style="max-width: 600px; margin: 1rem auto;">
+  <img src="assets/linkedin-pipeline.svg" alt="LinkedIn Pipeline" />
+</div>
+
+Write `::linkedin` at the top of an Obsidian note. Cadence detects it, runs the content through LinWheel's analyze + reshape pipeline, and saves drafts to the [LinWheel dashboard](https://www.linwheel.io/dashboard). You review and schedule from the UI.
+
+Angles can be overridden via frontmatter:
+
+```yaml
+---
+linkedin_angles: [field_note, synthesizer]
+---
+::linkedin
+
+Today I shipped a TypeScript SDK...
+```
 
 ## What's shipped
 
@@ -41,6 +56,7 @@ You write in Obsidian. Cadence watches, extracts, batches, and delivers — with
 | InsightDigest responder | Shipped |
 | TelegramNotifier responder | Shipped |
 | TaskLogger responder | Shipped |
+| LinWheelPublisher responder | Shipped |
 | Gateway integration | Shipped |
 | CLI commands | Planned |
 

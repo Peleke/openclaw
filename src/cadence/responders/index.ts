@@ -40,3 +40,11 @@ export {
   type TelegramNotifierConfig,
 } from "./telegram-notifier.js";
 export { createFileLogResponder, type FileLogResponderConfig } from "./file-log.js";
+export {
+  createLinWheelPublisherResponder,
+  type LinWheelPublisherOptions,
+} from "./linwheel-publisher/index.js";
+export {
+  type LinWheelPublisherConfig,
+  DEFAULT_PUBLISHER_CONFIG,
+} from "./linwheel-publisher/types.js";

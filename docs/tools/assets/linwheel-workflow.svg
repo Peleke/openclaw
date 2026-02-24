@@ -1,0 +1,174 @@
+<svg viewBox="0 0 672 660" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="roughen" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="2" result="noise" seed="21"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="a" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="#e0e0e0" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+    <marker id="a-purple" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="rgb(168,85,247)" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+  </defs>
+
+  <!-- TITLE -->
+  <text x="336" y="38" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="22" fill="#e0e0e0" font-weight="bold"
+        transform="rotate(-0.5, 336, 38)">
+    LinWheel Tool Workflow
+  </text>
+  <path d="M 180,46 C 260,48 410,44 492,47"
+        stroke="rgb(168,85,247)" stroke-width="1.5" fill="none"
+        stroke-linecap="round" opacity="0.6"/>
+
+  <!-- STAGE 1: Analyze -->
+  <g transform="rotate(-0.3, 336, 95)">
+    <circle cx="108" cy="72" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="77" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">1</text>
+    <path d="M 132,60 C 230,57 430,63 562,59
+             C 565,75 563,95 565,118
+             C 430,121 230,117 132,121
+             C 129,100 131,78 129,60"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="80" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">linwheel_analyze</text>
+    <text x="348" y="104" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">assess content, get fit score + suggested angles</text>
+  </g>
+
+  <path d="M 336,124 C 338,140 334,152 336,166"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#a)"/>
+
+  <!-- STAGE 2: Reshape -->
+  <g transform="rotate(0.4, 336, 210)" filter="url(#glow)">
+    <circle cx="108" cy="182" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="187" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">2</text>
+    <path d="M 132,170 C 230,167 430,173 562,169
+             C 565,188 563,214 565,238
+             C 430,241 230,237 132,241
+             C 129,218 131,190 129,170"
+          stroke="rgb(168,85,247)" stroke-width="2.5" fill="rgba(168,85,247,0.12)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="196" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">linwheel_reshape</text>
+    <text x="348" y="218" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">generate angle-specific drafts (saveDrafts: true)</text>
+    <text x="348" y="234" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="11" fill="rgb(168,85,247)" opacity="0.8">(core stage)</text>
+  </g>
+
+  <path d="M 336,244 C 338,260 334,272 336,286"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#a)"/>
+
+  <!-- STAGE 3: Refine -->
+  <g transform="rotate(-0.5, 336, 320)">
+    <circle cx="108" cy="302" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="307" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">3</text>
+    <path d="M 132,290 C 230,287 430,293 562,289
+             C 565,308 563,334 565,358
+             C 430,361 230,357 132,361
+             C 129,338 131,310 129,290"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="316" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">linwheel_refine</text>
+    <text x="348" y="338" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">polish best draft (light / medium / heavy)</text>
+  </g>
+
+  <path d="M 336,364 C 338,380 334,392 336,406"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#a)"/>
+
+  <!-- STAGE 4: Visuals -->
+  <g transform="rotate(0.3, 336, 440)">
+    <circle cx="108" cy="422" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="427" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">4</text>
+    <path d="M 132,410 C 230,407 430,413 562,409
+             C 565,428 563,454 565,478
+             C 430,481 230,477 132,481
+             C 129,458 131,430 129,410"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="436" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">linwheel_post_image</text>
+    <text x="348" y="458" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">attach hero image or carousel</text>
+  </g>
+
+  <path d="M 336,484 C 338,500 334,512 336,526"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#a)"/>
+
+  <!-- STAGE 5: Approve + Schedule -->
+  <g transform="rotate(-0.4, 336, 560)">
+    <circle cx="108" cy="542" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="547" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">5</text>
+    <path d="M 132,530 C 230,527 430,533 562,529
+             C 565,548 563,574 565,598
+             C 430,601 230,597 132,601
+             C 129,578 131,550 129,530"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="556" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">approve + schedule</text>
+    <text x="348" y="578" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">linwheel_post_approve &#x2192; linwheel_post_schedule</text>
+  </g>
+
+  <!-- EXTERNAL OUTPUT -->
+  <path d="M 568,566 C 582,566 594,566 606,566"
+        stroke="#888888" stroke-width="1.2" fill="none"
+        stroke-linecap="round" stroke-dasharray="4 4"
+        opacity="0.5"/>
+  <text x="614" y="558" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888" opacity="0.7">LinkedIn</text>
+  <text x="614" y="574" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888" opacity="0.7">auto-publish</text>
+
+  <!-- BOTTOM CAPTION -->
+  <text x="336" y="640" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="13" fill="#888888" opacity="0.7"
+        transform="rotate(-0.3, 336, 640)">
+    five-step pipeline from raw content to scheduled LinkedIn post
+  </text>
+</svg>

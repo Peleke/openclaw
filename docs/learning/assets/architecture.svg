@@ -1,1 +1,232 @@
-<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" class="flowchart" style="max-width: 386.996px; background-color: transparent;" viewBox="0 0 386.99609375 1265.436767578125" role="graphics-document document" aria-roledescription="flowchart-v2"><style>#my-svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;fill:#333;}@keyframes edge-animation-frame{from{stroke-dashoffset:0;}}@keyframes dash{to{stroke-dashoffset:0;}}#my-svg .edge-animation-slow{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 50s linear infinite;stroke-linecap:round;}#my-svg .edge-animation-fast{stroke-dasharray:9,5!important;stroke-dashoffset:900;animation:dash 20s linear infinite;stroke-linecap:round;}#my-svg .error-icon{fill:#552222;}#my-svg .error-text{fill:#552222;stroke:#552222;}#my-svg .edge-thickness-normal{stroke-width:1px;}#my-svg .edge-thickness-thick{stroke-width:3.5px;}#my-svg .edge-pattern-solid{stroke-dasharray:0;}#my-svg .edge-thickness-invisible{stroke-width:0;fill:none;}#my-svg .edge-pattern-dashed{stroke-dasharray:3;}#my-svg .edge-pattern-dotted{stroke-dasharray:2;}#my-svg .marker{fill:#333333;stroke:#333333;}#my-svg .marker.cross{stroke:#333333;}#my-svg svg{font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:16px;}#my-svg p{margin:0;}#my-svg .label{font-family:"trebuchet ms",verdana,arial,sans-serif;color:#333;}#my-svg .cluster-label text{fill:#333;}#my-svg .cluster-label span{color:#333;}#my-svg .cluster-label span p{background-color:transparent;}#my-svg .label text,#my-svg span{fill:#333;color:#333;}#my-svg .node rect,#my-svg .node circle,#my-svg .node ellipse,#my-svg .node polygon,#my-svg .node path{fill:#ECECFF;stroke:#9370DB;stroke-width:1px;}#my-svg .rough-node .label text,#my-svg .node .label text,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-anchor:middle;}#my-svg .node .katex path{fill:#000;stroke:#000;stroke-width:1px;}#my-svg .rough-node .label,#my-svg .node .label,#my-svg .image-shape .label,#my-svg .icon-shape .label{text-align:center;}#my-svg .node.clickable{cursor:pointer;}#my-svg .root .anchor path{fill:#333333!important;stroke-width:0;stroke:#333333;}#my-svg .arrowheadPath{fill:#333333;}#my-svg .edgePath .path{stroke:#333333;stroke-width:2.0px;}#my-svg .flowchart-link{stroke:#333333;fill:none;}#my-svg .edgeLabel{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .edgeLabel p{background-color:rgba(232,232,232, 0.8);}#my-svg .edgeLabel rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .labelBkg{background-color:rgba(232, 232, 232, 0.5);}#my-svg .cluster rect{fill:#ffffde;stroke:#aaaa33;stroke-width:1px;}#my-svg .cluster text{fill:#333;}#my-svg .cluster span{color:#333;}#my-svg div.mermaidTooltip{position:absolute;text-align:center;max-width:200px;padding:2px;font-family:"trebuchet ms",verdana,arial,sans-serif;font-size:12px;background:hsl(80, 100%, 96.2745098039%);border:1px solid #aaaa33;border-radius:2px;pointer-events:none;z-index:100;}#my-svg .flowchartTitleText{text-anchor:middle;font-size:18px;fill:#333;}#my-svg rect.text{fill:none;stroke-width:0;}#my-svg .icon-shape,#my-svg .image-shape{background-color:rgba(232,232,232, 0.8);text-align:center;}#my-svg .icon-shape p,#my-svg .image-shape p{background-color:rgba(232,232,232, 0.8);padding:2px;}#my-svg .icon-shape rect,#my-svg .image-shape rect{opacity:0.5;background-color:rgba(232,232,232, 0.8);fill:rgba(232,232,232, 0.8);}#my-svg .label-icon{display:inline-block;height:1em;overflow:visible;vertical-align:-0.125em;}#my-svg .node .label-icon path{fill:currentColor;stroke:revert;stroke-width:revert;}#my-svg :root{--mermaid-font-family:"trebuchet ms",verdana,arial,sans-serif;}</style><g><marker id="my-svg_flowchart-v2-pointEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 0 L 10 5 L 0 10 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-pointStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="4.5" refY="5" markerUnits="userSpaceOnUse" markerWidth="8" markerHeight="8" orient="auto"><path d="M 0 5 L 10 10 L 10 0 z" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleEnd" class="marker flowchart-v2" viewBox="0 0 10 10" refX="11" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-circleStart" class="marker flowchart-v2" viewBox="0 0 10 10" refX="-1" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><circle cx="5" cy="5" r="5" class="arrowMarkerPath" style="stroke-width: 1; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossEnd" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="12" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><marker id="my-svg_flowchart-v2-crossStart" class="marker cross flowchart-v2" viewBox="0 0 11 11" refX="-1" refY="5.2" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M 1,1 l 9,9 M 10,1 l -9,9" class="arrowMarkerPath" style="stroke-width: 2; stroke-dasharray: 1, 0;"/></marker><g class="root"><g class="clusters"><g class="cluster" id="Storage" data-look="classic"><rect style="fill:#fff3e0 !important" x="87.6328125" y="628" width="266.1640625" height="143.43672943115234"/><g class="cluster-label" transform="translate(180.16796875, 628)"><foreignObject width="81.09375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Persistence</p></span></div></foreignObject></g></g><g class="cluster" id="Feedback" data-look="classic"><rect style="fill:#fce4ec !important" x="8" y="370" width="276.953125" height="208"/><g class="cluster-label" transform="translate(79.1328125, 370)"><foreignObject width="134.6875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Post-Run Feedback</p></span></div></foreignObject></g></g><g class="cluster" id="Request" data-look="classic"><rect style="fill:#e3f2fd !important" x="10.578125" y="8" width="368.41796875" height="312"/><g class="cluster-label" transform="translate(143.435546875, 8)"><foreignObject width="102.703125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Agent Request</p></span></div></foreignObject></g></g></g><g class="edgePaths"><path d="M184.572,87L178.223,91.167C171.873,95.333,159.175,103.667,152.826,111.333C146.477,119,146.477,126,146.477,129.5L146.477,133" id="L_PS_TS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PS_TS_0" data-points="W3sieCI6MTg0LjU3MTg5MDAyNDAzODQ1LCJ5Ijo4N30seyJ4IjoxNDYuNDc2NTYyNSwieSI6MTEyfSx7IngiOjE0Ni40NzY1NjI1LCJ5IjoxMzd9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M146.477,191L146.477,195.167C146.477,199.333,146.477,207.667,146.477,215.333C146.477,223,146.477,230,146.477,233.5L146.477,237" id="L_TS_PA_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_TS_PA_0" data-points="W3sieCI6MTQ2LjQ3NjU2MjUsInkiOjE5MX0seyJ4IjoxNDYuNDc2NTYyNSwieSI6MjE2fSx7IngiOjE0Ni40NzY1NjI1LCJ5IjoyNDF9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M146.477,295L146.477,299.167C146.477,303.333,146.477,311.667,146.477,320C146.477,328.333,146.477,336.667,146.477,345C146.477,353.333,146.477,361.667,146.477,369.333C146.477,377,146.477,384,146.477,387.5L146.477,391" id="L_PA_RD_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PA_RD_0" data-points="W3sieCI6MTQ2LjQ3NjU2MjUsInkiOjI5NX0seyJ4IjoxNDYuNDc2NTYyNSwieSI6MzIwfSx7IngiOjE0Ni40NzY1NjI1LCJ5IjozNDV9LHsieCI6MTQ2LjQ3NjU2MjUsInkiOjM3MH0seyJ4IjoxNDYuNDc2NTYyNSwieSI6Mzk1fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M146.477,449L146.477,453.167C146.477,457.333,146.477,465.667,146.477,473.333C146.477,481,146.477,488,146.477,491.5L146.477,495" id="L_RD_PU_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_RD_PU_0" data-points="W3sieCI6MTQ2LjQ3NjU2MjUsInkiOjQ0OX0seyJ4IjoxNDYuNDc2NTYyNSwieSI6NDc0fSx7IngiOjE0Ni40NzY1NjI1LCJ5Ijo0OTl9XQ==" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M146.477,553L146.477,557.167C146.477,561.333,146.477,569.667,146.477,578C146.477,586.333,146.477,594.667,146.477,603C146.477,611.333,146.477,619.667,152.138,630.529C157.799,641.391,169.122,654.782,174.783,661.478L180.445,668.173" id="L_PU_DB_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_PU_DB_0" data-points="W3sieCI6MTQ2LjQ3NjU2MjUsInkiOjU1M30seyJ4IjoxNDYuNDc2NTYyNSwieSI6NTc4fSx7IngiOjE0Ni40NzY1NjI1LCJ5Ijo2MDN9LHsieCI6MTQ2LjQ3NjU2MjUsInkiOjYyOH0seyJ4IjoxODMuMDI3MzQzNzUsInkiOjY3MS4yMjc1OTE1NTQwODE1fV0=" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M268.402,671.228L274.494,664.023C280.586,656.818,292.77,642.409,298.861,631.038C304.953,619.667,304.953,611.333,304.953,603C304.953,594.667,304.953,586.333,304.953,573.5C304.953,560.667,304.953,543.333,304.953,526C304.953,508.667,304.953,491.333,304.953,474C304.953,456.667,304.953,439.333,304.953,422C304.953,404.667,304.953,387.333,304.953,374.5C304.953,361.667,304.953,353.333,304.953,345C304.953,336.667,304.953,328.333,304.953,315.5C304.953,302.667,304.953,285.333,304.953,268C304.953,250.667,304.953,233.333,304.953,216C304.953,198.667,304.953,181.333,304.953,164C304.953,146.667,304.953,129.333,299.161,116.866C293.369,104.398,281.786,96.796,275.994,92.996L270.202,89.195" id="L_DB_PS_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_DB_PS_0" data-points="W3sieCI6MjY4LjQwMjM0Mzc1LCJ5Ijo2NzEuMjI3NTkxNTU0MDgxNX0seyJ4IjozMDQuOTUzMTI1LCJ5Ijo2Mjh9LHsieCI6MzA0Ljk1MzEyNSwieSI6NjAzfSx7IngiOjMwNC45NTMxMjUsInkiOjU3OH0seyJ4IjozMDQuOTUzMTI1LCJ5Ijo1MjZ9LHsieCI6MzA0Ljk1MzEyNSwieSI6NDc0fSx7IngiOjMwNC45NTMxMjUsInkiOjQyMn0seyJ4IjozMDQuOTUzMTI1LCJ5IjozNzB9LHsieCI6MzA0Ljk1MzEyNSwieSI6MzQ1fSx7IngiOjMwNC45NTMxMjUsInkiOjMyMH0seyJ4IjozMDQuOTUzMTI1LCJ5IjoyNjh9LHsieCI6MzA0Ljk1MzEyNSwieSI6MjE2fSx7IngiOjMwNC45NTMxMjUsInkiOjE2NH0seyJ4IjozMDQuOTUzMTI1LCJ5IjoxMTJ9LHsieCI6MjY2Ljg1Nzc5NzQ3NTk2MTU1LCJ5Ijo4N31d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/><path d="M225.715,746.437L225.715,750.603C225.715,754.77,225.715,763.103,225.715,771.437C225.715,779.77,225.715,788.103,225.715,795.77C225.715,803.437,225.715,810.437,225.715,813.937L225.715,817.437" id="L_DB_Observe_0" class="edge-thickness-normal edge-pattern-solid edge-thickness-normal edge-pattern-solid flowchart-link" style=";" data-edge="true" data-et="edge" data-id="L_DB_Observe_0" data-points="W3sieCI6MjI1LjcxNDg0Mzc1LCJ5Ijo3NDYuNDM2NzI5NDMxMTUyM30seyJ4IjoyMjUuNzE0ODQzNzUsInkiOjc3MS40MzY3Mjk0MzExNTIzfSx7IngiOjIyNS43MTQ4NDM3NSwieSI6Nzk2LjQzNjcyOTQzMTE1MjN9LHsieCI6MjI1LjcxNDg0Mzc1LCJ5Ijo4MjEuNDM2NzI5NDMxMTUyM31d" marker-end="url(#my-svg_flowchart-v2-pointEnd)"/></g><g class="edgeLabels"><g class="edgeLabel"><g class="label" data-id="L_PS_TS_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_TS_PA_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PA_RD_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_RD_PU_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_PU_DB_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_DB_PS_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g><g class="edgeLabel"><g class="label" data-id="L_DB_Observe_0" transform="translate(0, 0)"><foreignObject width="0" height="0"><div xmlns="http://www.w3.org/1999/xhtml" class="labelBkg" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="edgeLabel"></span></div></foreignObject></g></g></g><g class="nodes"><g class="root" transform="translate(112.97265625, 813.4367294311523)"><g class="clusters"><g class="cluster" id="Observe" data-look="classic"><rect style="fill:#e8f5e9 !important" x="8" y="8" width="209.484375" height="436"/><g class="cluster-label" transform="translate(65.5625, 8)"><foreignObject width="94.359375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Observability</p></span></div></foreignObject></g></g></g><g class="edgePaths"/><g class="edgeLabels"/><g class="nodes"><g class="node default" id="flowchart-CLI-6" transform="translate(112.7421875, 70)"><rect class="basic label-container" style="" x="-41.0625" y="-27" width="82.125" height="54"/><g class="label" style="" transform="translate(-11.0625, -12)"><rect/><foreignObject width="22.125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>CLI</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-DASH-7" transform="translate(112.7421875, 174)"><rect class="basic label-container" style="" x="-67.2421875" y="-27" width="134.484375" height="54"/><g class="label" style="" transform="translate(-37.2421875, -12)"><rect/><foreignObject width="74.484375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Dashboard</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-API-8" transform="translate(112.7421875, 278)"><rect class="basic label-container" style="" x="-60.6640625" y="-27" width="121.328125" height="54"/><g class="label" style="" transform="translate(-30.6640625, -12)"><rect/><foreignObject width="61.328125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>REST API</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-EXP-9" transform="translate(112.7421875, 382)"><rect class="basic label-container" style="" x="-53.328125" y="-27" width="106.65625" height="54"/><g class="label" style="" transform="translate(-23.328125, -12)"><rect/><foreignObject width="46.65625" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Export</p></span></div></foreignObject></g></g></g></g><g class="node default" id="flowchart-PS-0" transform="translate(225.71484375, 60)"><rect class="basic label-container" style="" x="-93.0859375" y="-27" width="186.171875" height="54"/><g class="label" style="" transform="translate(-63.0859375, -12)"><rect/><foreignObject width="126.171875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Pre-Run Selection</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-TS-1" transform="translate(146.4765625, 164)"><rect class="basic label-container" style="" x="-100.8984375" y="-27" width="201.796875" height="54"/><g class="label" style="" transform="translate(-70.8984375, -12)"><rect/><foreignObject width="141.796875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Thompson Sampling</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PA-2" transform="translate(146.4765625, 268)"><rect class="basic label-container" style="" x="-90.6875" y="-27" width="181.375" height="54"/><g class="label" style="" transform="translate(-60.6875, -12)"><rect/><foreignObject width="121.375" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Prompt Assembly</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-RD-3" transform="translate(146.4765625, 422)"><rect class="basic label-container" style="" x="-103.4765625" y="-27" width="206.953125" height="54"/><g class="label" style="" transform="translate(-73.4765625, -12)"><rect/><foreignObject width="146.953125" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Reference Detection</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-PU-4" transform="translate(146.4765625, 526)"><rect class="basic label-container" style="" x="-89.1484375" y="-27" width="178.296875" height="54"/><g class="label" style="" transform="translate(-59.1484375, -12)"><rect/><foreignObject width="118.296875" height="24"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Post-Run Update</p></span></div></foreignObject></g></g><g class="node default" id="flowchart-DB-5" transform="translate(225.71484375, 699.7183647155762)"><path d="M0,10.1455733808675 a42.6875,10.1455733808675 0,0,0 85.375,0 a42.6875,10.1455733808675 0,0,0 -85.375,0 l0,73.1455733808675 a42.6875,10.1455733808675 0,0,0 85.375,0 l0,-73.1455733808675" class="basic label-container" style="" transform="translate(-42.6875, -46.71836007130125)"/><g class="label" style="" transform="translate(-35.1875, -14)"><rect/><foreignObject width="70.375" height="48"><div xmlns="http://www.w3.org/1999/xhtml" style="display: table-cell; white-space: nowrap; line-height: 1.5; max-width: 200px; text-align: center;"><span class="nodeLabel"><p>Posteriors<br />SQLite</p></span></div></foreignObject></g></g></g></g></g></svg>
+<svg viewBox="0 0 672 720" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="roughen" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="2" result="noise" seed="42"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arr" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="#e0e0e0" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+    <marker id="arr-purple" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="rgb(168,85,247)" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+    <marker id="arr-muted" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="#888888" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+  </defs>
+
+  <!-- TITLE -->
+  <text x="280" y="38" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="22" fill="#e0e0e0" font-weight="bold"
+        transform="rotate(-0.4, 280, 38)">
+    Learning Module Architecture
+  </text>
+  <path d="M 100,46 C 190,48 370,44 460,47"
+        stroke="rgb(168,85,247)" stroke-width="1.5" fill="none"
+        stroke-linecap="round" opacity="0.6"/>
+
+  <!-- REGION LABEL: Agent Request -->
+  <path d="M 86,58 C 88,56 92,55 96,56"
+        stroke="#4a9eff" stroke-width="1.2" fill="none"
+        stroke-linecap="round" opacity="0.5"/>
+  <text x="92" y="73" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#4a9eff" opacity="0.6">agent request</text>
+
+  <!-- STAGE 1: Pre-Run Selection -->
+  <g transform="rotate(-0.3, 300, 105)">
+    <circle cx="108" cy="82" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="87" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">1</text>
+    <path d="M 132,70 C 230,67 400,73 502,69
+             C 505,85 503,105 505,128
+             C 400,131 230,127 132,131
+             C 129,110 131,88 129,70"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="318" y="92" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">Pre-Run Selection</text>
+    <text x="318" y="114" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">pick arms to include in this request</text>
+  </g>
+
+  <path d="M 300,134 C 302,150 298,162 300,176"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arr)"/>
+
+  <!-- STAGE 2: Thompson Sampling (CORE, glow) -->
+  <g transform="rotate(0.5, 300, 220)" filter="url(#glow)">
+    <circle cx="108" cy="192" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="197" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">2</text>
+    <path d="M 132,180 C 230,177 400,183 502,179
+             C 505,198 503,224 505,248
+             C 400,251 230,247 132,251
+             C 129,228 131,200 129,180"
+          stroke="rgb(168,85,247)" stroke-width="2.5" fill="rgba(168,85,247,0.12)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="318" y="206" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">Thompson Sampling</text>
+    <text x="318" y="228" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">sample from Beta posteriors, rank arms</text>
+    <text x="318" y="244" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="11" fill="rgb(168,85,247)" opacity="0.8">(Bayesian bandit)</text>
+  </g>
+
+  <path d="M 300,254 C 302,270 298,282 300,296"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arr)"/>
+
+  <!-- STAGE 3: Prompt Assembly -->
+  <g transform="rotate(-0.4, 300, 330)">
+    <circle cx="108" cy="312" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="317" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">3</text>
+    <path d="M 132,300 C 230,297 400,303 502,299
+             C 505,318 503,344 505,368
+             C 400,371 230,367 132,371
+             C 129,348 131,320 129,300"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="318" y="326" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">Prompt Assembly</text>
+    <text x="318" y="348" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">build final prompt with selected arms</text>
+  </g>
+
+  <!-- REGION LABEL: Post-Run Feedback -->
+  <path d="M 86,388 C 88,386 92,385 96,386"
+        stroke="#ff6b6b" stroke-width="1.2" fill="none"
+        stroke-linecap="round" opacity="0.5"/>
+  <text x="92" y="403" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#ff6b6b" opacity="0.6">post-run feedback</text>
+
+  <path d="M 300,374 C 302,390 298,402 300,416"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arr)"/>
+
+  <!-- STAGE 4: Reference Detection -->
+  <g transform="rotate(0.3, 300, 450)">
+    <circle cx="108" cy="432" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="437" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">4</text>
+    <path d="M 132,420 C 230,417 400,423 502,419
+             C 505,438 503,464 505,488
+             C 400,491 230,487 132,491
+             C 129,468 131,440 129,420"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="318" y="446" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">Reference Detection</text>
+    <text x="318" y="468" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">trace which arms the model actually used</text>
+  </g>
+
+  <path d="M 300,494 C 302,510 298,522 300,536"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arr)"/>
+
+  <!-- STAGE 5: Post-Run Update -->
+  <g transform="rotate(-0.5, 300, 570)">
+    <circle cx="108" cy="552" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="557" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">5</text>
+    <path d="M 132,540 C 230,537 400,543 502,539
+             C 505,558 503,584 505,608
+             C 400,611 230,607 132,611
+             C 129,588 131,560 129,540"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="318" y="566" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">Post-Run Update</text>
+    <text x="318" y="588" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">update Beta(&#x3B1;,&#x3B2;) posteriors in SQLite</text>
+  </g>
+
+  <!-- FEEDBACK LOOP: back to Pre-Run Selection -->
+  <path d="M 508,575 C 540,575 558,560 562,520
+           C 566,440 566,320 562,220
+           C 558,140 540,105 510,100"
+        stroke="rgb(168,85,247)" stroke-width="1.8" fill="none"
+        stroke-linecap="round" stroke-dasharray="6 4"
+        opacity="0.5" marker-end="url(#arr-purple)"/>
+  <text x="576" y="340" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="rgb(168,85,247)" opacity="0.6"
+        transform="rotate(90, 576, 340)">feedback loop</text>
+
+  <!-- OBSERVABILITY SIDE PANEL -->
+  <text x="42" y="510" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="12" fill="#4ade80" opacity="0.7">observability</text>
+  <path d="M 14,520 C 16,518 66,518 70,520
+           C 72,540 72,620 70,640
+           C 66,642 16,642 14,640
+           C 12,620 12,540 14,520"
+        stroke="#4ade80" stroke-width="1.2" fill="rgba(74,222,128,0.06)"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.6"/>
+  <text x="42" y="540" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888">CLI</text>
+  <text x="42" y="565" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888">Dashboard</text>
+  <text x="42" y="590" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888">REST API</text>
+  <text x="42" y="615" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888">Export</text>
+
+  <!-- dashed line from observability to stage 5 -->
+  <path d="M 74,580 C 88,580 100,578 124,575"
+        stroke="#888888" stroke-width="1" fill="none"
+        stroke-linecap="round" stroke-dasharray="3 3"
+        opacity="0.4"/>
+
+  <!-- BOTTOM CAPTION -->
+  <text x="300" y="660" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="13" fill="#888888" opacity="0.7"
+        transform="rotate(-0.3, 300, 660)">
+    Bayesian bandit loop: select &#x2192; assemble &#x2192; run &#x2192; trace &#x2192; update posteriors &#x2192; repeat
+  </text>
+
+  <!-- FLOW HINT -->
+  <text x="300" y="695" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="10" fill="#64748b" opacity="0.5">
+    &#x2193; signal flow &#x2193;
+  </text>
+</svg>

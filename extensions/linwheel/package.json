@@ -1,0 +1,14 @@
+{
+  "name": "@openclaw/linwheel",
+  "version": "2026.2.23",
+  "type": "module",
+  "description": "OpenClaw LinWheel content engine plugin — LinkedIn post drafting, scheduling, and voice profiles.",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "dependencies": {
+    "@linwheel/sdk": "0.1.0"
+  }
+}
