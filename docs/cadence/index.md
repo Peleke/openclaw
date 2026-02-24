@@ -30,6 +30,32 @@ Obsidian vault edit
 
 You write in Obsidian. Cadence watches, extracts, batches, and delivers — without being asked.
 
+## LinkedIn Pipeline
+
+The LinWheel Publisher turns notes into LinkedIn drafts:
+
+```
+Obsidian vault edit with ::linkedin marker
+  → ObsidianWatcher emits obsidian.note.modified
+  → LinWheelPublisher filters for ::linkedin, debounces 3s
+  → Calls LinWheel API: analyze (fit score + angles) → reshape (generate drafts)
+  → Drafts saved to LinWheel dashboard for review/scheduling
+  → Emits linwheel.drafts.generated
+```
+
+Write `::linkedin` at the top of an Obsidian note. Cadence detects it, runs the content through LinWheel's analyze + reshape pipeline, and saves drafts to the [LinWheel dashboard](https://www.linwheel.io/dashboard). You review and schedule from the UI.
+
+Angles can be overridden via frontmatter:
+
+```yaml
+---
+linkedin_angles: [field_note, synthesizer]
+---
+::linkedin
+
+Today I shipped a TypeScript SDK...
+```
+
 ## What's shipped
 
 | Component | Status |
@@ -41,6 +67,7 @@ You write in Obsidian. Cadence watches, extracts, batches, and delivers — with
 | InsightDigest responder | Shipped |
 | TelegramNotifier responder | Shipped |
 | TaskLogger responder | Shipped |
+| LinWheelPublisher responder | Shipped |
 | Gateway integration | Shipped |
 | CLI commands | Planned |
 

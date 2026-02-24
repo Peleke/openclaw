@@ -80,6 +80,18 @@ Emitted when a content draft is generated from insights.
 
 **Source:** Planned (not yet implemented)
 
+### `linwheel.drafts.generated`
+
+Emitted after the LinWheel Publisher generates LinkedIn drafts from a `::linkedin`-tagged note.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `noteFile` | `string` | Path to the source Obsidian note |
+| `postsCreated` | `number` | Number of drafts generated |
+| `angles` | `string[]` | Angles used for reshape (e.g., `["field_note", "contrarian"]`) |
+
+**Source:** LinWheelPublisher responder
+
 ## Scheduling signals
 
 ### `cadence.cron.fired`

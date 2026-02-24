@@ -160,6 +160,7 @@ tool usage guidance is injected into prompts. Some plugins ship their own skills
 alongside tools (for example, the voice-call plugin).
 
 Optional plugin tools:
+- [LinWheel](/tools/linwheel): 17 tools for LinkedIn content drafting, scheduling, and voice profiles via the [LinWheel](https://www.linwheel.io) API.
 - [Lobster](/tools/lobster): typed workflow runtime with resumable approvals (requires the Lobster CLI on the gateway host).
 - [LLM Task](/tools/llm-task): JSON-only LLM step for structured workflow output (optional schema validation).
 
