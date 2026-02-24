@@ -114,7 +114,7 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
               postsCreated: postCount,
               angles: reshapeAngles.length > 0 ? reshapeAngles : config.defaultAngles,
             },
-          } as unknown as OpenClawSignal);
+          });
         } catch (err) {
           log.error(
             `LinWheel pipeline failed for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,

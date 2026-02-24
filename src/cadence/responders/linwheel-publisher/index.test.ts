@@ -143,7 +143,13 @@ describe("LinWheelPublisherResponder", () => {
     unsub();
   });
 
-  it("respects frontmatter linkedin_angles override", async () => {
+  it("uses frontmatter angles when analyze returns none", async () => {
+    // When analyze returns no suggested angles, frontmatter overrides should be used
+    (client.analyze as ReturnType<typeof vi.fn>).mockResolvedValue({
+      linkedinFit: { score: 6 },
+      suggestedAngles: [],
+    });
+
     const responder = createLinWheelPublisherResponder({ client, config: { debounceMs: 100 } });
     const unsub = responder.register(bus);
 
@@ -155,9 +161,11 @@ describe("LinWheelPublisherResponder", () => {
     vi.advanceTimersByTime(200);
     await vi.advanceTimersByTimeAsync(0);
 
-    // Frontmatter angles should be passed, but analyze suggestions take priority
-    // if analyze returns angles. The frontmatter is the fallback.
-    expect(client.analyze).toHaveBeenCalled();
+    expect(client.reshape).toHaveBeenCalledWith(
+      expect.objectContaining({
+        angles: ["provocateur", "curious_cat"],
+      }),
+    );
 
     unsub();
   });
@@ -212,6 +220,33 @@ describe("LinWheelPublisherResponder", () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(client.analyze).toHaveBeenCalledTimes(1);
+
+    unsub();
+  });
+
+  it("emits linwheel.drafts.generated signal after pipeline", async () => {
+    const responder = createLinWheelPublisherResponder({ client, config: { debounceMs: 100 } });
+    const unsub = responder.register(bus);
+
+    const emitted: OpenClawSignal[] = [];
+    bus.on("linwheel.drafts.generated", (signal) => {
+      emitted.push(signal);
+    });
+
+    const content = "::linkedin\n\n" + "I".repeat(100);
+    await bus.emit(noteSignal(content, "Buildlog/signal-test.md"));
+
+    vi.advanceTimersByTime(200);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(emitted).toHaveLength(1);
+    expect(emitted[0].payload).toEqual(
+      expect.objectContaining({
+        noteFile: "Buildlog/signal-test.md",
+        postsCreated: 2,
+        angles: ["field_note", "contrarian"],
+      }),
+    );
 
     unsub();
   });
