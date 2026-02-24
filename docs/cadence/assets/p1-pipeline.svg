@@ -1,0 +1,184 @@
+<svg viewBox="0 0 672 620" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="roughen" x="-2%" y="-2%" width="104%" height="104%">
+      <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves="2" result="noise" seed="7"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.1" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrow" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="#e0e0e0" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="rgb(168,85,247)" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+    <marker id="arrow-muted" viewBox="0 0 12 10" refX="10" refY="5"
+            markerWidth="8" markerHeight="6" orient="auto-start-reverse"
+            fill="none" stroke="#888888" stroke-width="1.5"
+            stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 1,1 L 10,5 L 1,9"/>
+    </marker>
+  </defs>
+
+  <!-- TITLE -->
+  <text x="336" y="38" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="22" fill="#e0e0e0" font-weight="bold"
+        transform="rotate(-0.5, 336, 38)">
+    P1 Content Pipeline
+  </text>
+  <path d="M 200,46 C 270,48 400,44 472,47"
+        stroke="rgb(168,85,247)" stroke-width="1.5" fill="none"
+        stroke-linecap="round" opacity="0.6"/>
+
+  <!-- EXTERNAL INPUT: Obsidian Vault -->
+  <text x="58" y="82" text-anchor="end"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="12" fill="#888888" opacity="0.7">Obsidian</text>
+  <text x="58" y="97" text-anchor="end"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888" opacity="0.6">vault edit</text>
+  <path d="M 64,90 C 78,89 90,88 100,87"
+        stroke="#888888" stroke-width="1.2" fill="none"
+        stroke-linecap="round" stroke-dasharray="4 4"
+        opacity="0.5" marker-end="url(#arrow-muted)"/>
+
+  <!-- STAGE 1: ObsidianWatcher -->
+  <g transform="rotate(-0.3, 336, 100)">
+    <circle cx="108" cy="72" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="77" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">1</text>
+    <path d="M 132,60 C 230,57 430,63 562,59
+             C 565,75 563,95 565,118
+             C 430,121 230,117 132,121
+             C 129,100 131,78 129,60"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="82" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">ObsidianWatcher</text>
+    <text x="348" y="104" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">watches vault, emits obsidian.note.modified</text>
+  </g>
+
+  <path d="M 336,124 C 338,140 334,152 336,166"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arrow)"/>
+  <text x="360" y="150" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="10" fill="#888888" opacity="0.6">file content + frontmatter</text>
+
+  <!-- STAGE 2: InsightExtractor -->
+  <g transform="rotate(0.4, 336, 210)">
+    <circle cx="108" cy="182" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="187" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">2</text>
+    <path d="M 132,170 C 230,167 430,173 562,169
+             C 565,188 563,214 565,238
+             C 430,241 230,237 132,241
+             C 129,218 131,190 129,170"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="196" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">InsightExtractor</text>
+    <text x="348" y="218" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">filters ::publish, debounces, calls LLM</text>
+  </g>
+
+  <path d="M 336,244 C 338,260 334,272 336,286"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arrow)"/>
+  <text x="360" y="270" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="10" fill="#888888" opacity="0.6">journal.insight.extracted</text>
+
+  <!-- STAGE 3: InsightDigest -->
+  <g transform="rotate(-0.6, 336, 330)">
+    <circle cx="108" cy="302" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="307" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">3</text>
+    <path d="M 132,290 C 230,287 430,293 562,289
+             C 565,308 563,334 565,358
+             C 430,361 230,357 132,361
+             C 129,338 131,310 129,290"
+          stroke="rgb(168,85,247)" stroke-width="2" fill="rgba(168,85,247,0.08)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="316" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">InsightDigest</text>
+    <text x="348" y="338" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">queues insights, flushes on count/time/cron</text>
+  </g>
+
+  <path d="M 336,364 C 338,380 334,392 336,406"
+        stroke="#e0e0e0" stroke-width="2" fill="none"
+        stroke-linecap="round" marker-end="url(#arrow)"/>
+  <text x="360" y="390" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="10" fill="#888888" opacity="0.6">journal.digest.ready</text>
+
+  <!-- STAGE 4: TelegramNotifier (CORE, glow) -->
+  <g transform="rotate(0.3, 336, 450)" filter="url(#glow)">
+    <circle cx="108" cy="422" r="14" fill="rgb(168,85,247)" stroke="none" opacity="0.9"/>
+    <text x="108" y="427" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="14" fill="white" font-weight="bold">4</text>
+    <path d="M 132,410 C 230,407 430,413 562,409
+             C 565,428 563,454 565,478
+             C 430,481 230,477 132,481
+             C 129,458 131,430 129,410"
+          stroke="rgb(168,85,247)" stroke-width="2.5" fill="rgba(168,85,247,0.12)"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="348" y="436" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="15" fill="#e0e0e0" font-weight="bold">TelegramNotifier</text>
+    <text x="348" y="458" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="12" fill="#888888">formats digest, delivers to Telegram</text>
+    <text x="348" y="474" text-anchor="middle"
+          font-family="'Caveat', 'Comic Sans MS', cursive"
+          font-size="11" fill="rgb(168,85,247)" opacity="0.8">(delivery)</text>
+  </g>
+
+  <!-- EXTERNAL OUTPUT -->
+  <path d="M 568,446 C 582,446 594,446 606,446"
+        stroke="#888888" stroke-width="1.2" fill="none"
+        stroke-linecap="round" stroke-dasharray="4 4"
+        opacity="0.5" marker-end="url(#arrow-muted)"/>
+  <text x="614" y="438" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888" opacity="0.7">Telegram</text>
+  <text x="614" y="454" text-anchor="start"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="11" fill="#888888" opacity="0.7">message</text>
+
+  <!-- BOTTOM CAPTION -->
+  <text x="336" y="520" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="13" fill="#888888" opacity="0.7"
+        transform="rotate(-0.3, 336, 520)">
+    write in Obsidian with ::publish &#x2014; cadence watches, extracts, batches, delivers
+  </text>
+
+  <!-- FLOW DIRECTION HINT -->
+  <text x="336" y="560" text-anchor="middle"
+        font-family="'Caveat', 'Comic Sans MS', cursive"
+        font-size="10" fill="#64748b" opacity="0.5">
+    &#x2193; signal flow &#x2193;
+  </text>
+</svg>

@@ -143,11 +143,6 @@ The LinWheel Publisher responder automatically generates drafts when you write
 
 ## Example workflow
 
-```
-1. linwheel_analyze  → assess content, get suggested angles
-2. linwheel_reshape  → generate drafts from best angles (saveDrafts: true)
-3. linwheel_refine   → polish the best draft
-4. linwheel_post_image → attach a hero image
-5. linwheel_post_approve → mark as ready
-6. linwheel_post_schedule → schedule for tomorrow 9am
-```
+<div style="max-width: 600px; margin: 1rem auto;">
+  <img src="assets/linwheel-workflow.svg" alt="LinWheel Tool Workflow" />
+</div>
