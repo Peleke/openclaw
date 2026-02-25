@@ -104,25 +104,38 @@ export async function createGatewayRuntimeState(params: {
     log: params.logPlugins,
   });
 
-  // Shared qortex connection: one subprocess for the entire gateway lifetime.
+  // Shared qortex connection: one process-wide connection for the entire gateway lifetime.
   // Used by learning API, learning select/observe (agent runs), memory search/get/feedback.
   // Eagerly initialized so it's ready before the first message arrives.
+  // Supports both stdio (subprocess) and HTTP (remote qortex serve) transports.
   try {
     const { QortexMcpConnection, parseCommandString, setSharedQortexConnection } =
       await import("../qortex/connection.js");
     const learningCfg = params.cfg?.learning;
     const memoryCfg = params.cfg?.agents?.defaults?.memorySearch;
-    const qortexCmd =
-      learningCfg?.qortex?.command ?? memoryCfg?.qortex?.command ?? "uvx qortex mcp-serve";
-    const connConfig = parseCommandString(qortexCmd);
-    const sharedConn = new QortexMcpConnection(connConfig);
+
+    const transport = learningCfg?.qortex?.transport ?? memoryCfg?.qortex?.transport;
+    const httpConfig = learningCfg?.qortex?.http ?? memoryCfg?.qortex?.http;
+
+    let sharedConn: import("../qortex/types.js").QortexConnection;
+    if (transport === "http" && httpConfig) {
+      const { QortexHttpConnection } = await import("../qortex/http-connection.js");
+      sharedConn = new QortexHttpConnection(httpConfig.baseUrl, httpConfig.headers);
+    } else {
+      const qortexCmd =
+        learningCfg?.qortex?.command ?? memoryCfg?.qortex?.command ?? "uvx qortex mcp-serve";
+      const connConfig = parseCommandString(qortexCmd);
+      sharedConn = new QortexMcpConnection(connConfig);
+    }
+
     try {
       await sharedConn.init();
       setSharedQortexConnection(sharedConn);
+      const transportLabel = transport === "http" ? `http → ${httpConfig?.baseUrl}` : "stdio";
       const learningCfgStatus = learningCfg?.enabled
         ? `learning: active, phase=${learningCfg.phase ?? "unknown"}, learner=${learningCfg.learnerName ?? "openclaw"}`
         : "learning: disabled";
-      params.log.info(`qortex shared connection ready (${learningCfgStatus})`);
+      params.log.info(`qortex shared connection ready [${transportLabel}] (${learningCfgStatus})`);
     } catch (err) {
       params.log.warn(`qortex shared connection failed to init: ${String(err)}`);
     }

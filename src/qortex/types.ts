@@ -3,7 +3,7 @@
  *
  * Implemented by:
  * - QortexMcpConnection (MCP subprocess via StdioClientTransport)
- * - QortexHttpClient (HTTP REST, future; see Peleke/qortex#63)
+ * - QortexHttpConnection (MCP over HTTP via StreamableHTTPClientTransport)
  */
 export interface QortexConnection {
   readonly isConnected: boolean;

@@ -98,6 +98,23 @@ export default { register(api) {
     expect(tools.map((tool) => tool.name)).toContain("optional_tool");
   });
 
+  it("allows optional tools via wildcard (*)", () => {
+    const plugin = writePlugin({ id: "optional-demo", body: pluginBody });
+    const tools = resolvePluginTools({
+      context: {
+        config: {
+          plugins: {
+            load: { paths: [plugin.file] },
+            allow: [plugin.id],
+          },
+        },
+        workspaceDir: plugin.dir,
+      },
+      toolAllowlist: ["*"],
+    });
+    expect(tools.map((tool) => tool.name)).toContain("optional_tool");
+  });
+
   it("allows optional tools via plugin groups", () => {
     const plugin = writePlugin({ id: "optional-demo", body: pluginBody });
     const toolsAll = resolvePluginTools({

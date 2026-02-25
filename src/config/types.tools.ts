@@ -245,6 +245,15 @@ export type MemorySearchConfig = {
     topK?: number;
     /** Enable memory_feedback tool for retrieval improvement (default: true). */
     feedback?: boolean;
+    /** Transport mode: "stdio" (default, subprocess) or "http" (remote qortex serve). */
+    transport?: "stdio" | "http";
+    /** HTTP transport configuration (required when transport="http"). */
+    http?: {
+      /** Base URL of the qortex HTTP server (e.g. "http://localhost:8400"). */
+      baseUrl: string;
+      /** Extra headers to send with every request. */
+      headers?: Record<string, string>;
+    };
   };
   remote?: {
     baseUrl?: string;

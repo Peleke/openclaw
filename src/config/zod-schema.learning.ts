@@ -10,6 +10,14 @@ export const LearningSchema = z
     qortex: z
       .object({
         command: z.string().optional(),
+        transport: z.enum(["stdio", "http"]).optional(),
+        http: z
+          .object({
+            baseUrl: z.string(),
+            headers: z.record(z.string(), z.string()).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),
