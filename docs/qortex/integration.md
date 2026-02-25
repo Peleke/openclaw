@@ -15,7 +15,13 @@ supports Thompson Sampling feedback to improve retrieval over time.
 
 ## How it connects
 
-The gateway spawns qortex as a **child process** communicating over stdio MCP:
+The gateway supports two transport modes for qortex: **stdio** (child process)
+and **HTTP** (MCP Streamable HTTP). A single shared connection is created at
+gateway boot; both the memory provider and the learning client reuse it.
+
+### stdio transport (default)
+
+The gateway spawns qortex as a child process communicating over stdio MCP:
 
 ```
 OpenClaw Gateway
@@ -26,12 +32,29 @@ OpenClaw Gateway
             └─ Learning layer (Thompson Sampling bandits)
 ```
 
-A single shared `QortexMcpConnection` is created at gateway boot. Both the
-memory provider and the learning client reuse this connection, avoiding
-duplicate subprocesses.
-
 The connection forwards environment variables matching these prefixes to
 the subprocess: `QORTEX_*`, `OTEL_*`, `VIRTUAL_ENV`, `HF_*`, `MEMGRAPH_*`.
+
+### HTTP transport
+
+When `memorySearch.qortex.transport` is `"http"`, the gateway connects to a
+running qortex MCP service over Streamable HTTP instead of spawning a
+subprocess:
+
+```
+OpenClaw Gateway
+  └─ QortexHttpConnection (StreamableHTTPClientTransport)
+       └─ POST http://localhost:8401/mcp
+            └─ qortex-mcp.service (systemd, FastMCP streamable-http)
+                 ├─ Vec layer
+                 ├─ Graph layer
+                 └─ Learning layer
+```
+
+This is the recommended mode for sandbox deployments where `qortex-mcp.service`
+runs as a persistent systemd service. No subprocess management, no environment
+variable forwarding — the service has its own environment via systemd
+`EnvironmentFile`.
 
 ## Gateway config
 
@@ -54,12 +77,14 @@ Set qortex as the memory provider:
 | Key | Default | Description |
 |-----|---------|-------------|
 | `memorySearch.provider` | `"openai"` | Set to `"qortex"` to enable graph-enhanced search. |
-| `memorySearch.qortex.command` | `"uvx qortex mcp-serve"` | MCP server command to spawn. |
+| `memorySearch.qortex.command` | `"uvx qortex mcp-serve"` | MCP server command to spawn (stdio transport). |
+| `memorySearch.qortex.transport` | `"stdio"` | Transport mode: `"stdio"` (subprocess) or `"http"` (Streamable HTTP). |
+| `memorySearch.qortex.http.baseUrl` | -- | MCP endpoint URL (required when transport is `"http"`). |
 | `memorySearch.qortex.domains` | `["memory/{agentId}"]` | qortex domains to query. Auto-mapped per agent. |
 | `memorySearch.qortex.topK` | `10` | Max results per query. |
 | `memorySearch.qortex.feedback` | `true` | Enable `memory_feedback` tool for Thompson Sampling. |
 
-### Full example
+### Full example (stdio)
 
 ```json5
 {
@@ -78,6 +103,33 @@ Set qortex as the memory provider:
   }
 }
 ```
+
+### Full example (HTTP transport)
+
+```json5
+{
+  agents: {
+    defaults: {
+      memorySearch: {
+        provider: "qortex",
+        qortex: {
+          transport: "http",
+          http: {
+            baseUrl: "http://localhost:8401/mcp"
+          },
+          domains: ["memory/main"],
+          topK: 15,
+          feedback: true
+        }
+      }
+    }
+  }
+}
+```
+
+The HTTP transport is automatically configured by the Bilrost provisioner when
+`qortex_mcp_enabled` is true. The `learning` config block also supports the
+same `transport` and `http.baseUrl` keys.
 
 ## MCP tools available
 
