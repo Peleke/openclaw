@@ -91,6 +91,15 @@ export type LearningConfig = {
   qortex?: {
     /** Command to spawn qortex MCP server. Default: "uvx qortex mcp-serve". */
     command?: string;
+    /** Transport mode: "stdio" (default, subprocess) or "http" (remote qortex serve). */
+    transport?: "stdio" | "http";
+    /** HTTP transport configuration (required when transport="http"). */
+    http?: {
+      /** Base URL of the qortex HTTP server (e.g. "http://localhost:8400"). */
+      baseUrl: string;
+      /** Extra headers to send with every request. */
+      headers?: Record<string, string>;
+    };
   };
   /** Learner name in qortex. Default: "openclaw". */
   learnerName?: string;

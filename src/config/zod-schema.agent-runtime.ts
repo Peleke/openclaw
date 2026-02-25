@@ -323,6 +323,14 @@ export const MemorySearchSchema = z
         domains: z.array(z.string()).optional(),
         topK: z.number().int().positive().optional(),
         feedback: z.boolean().optional(),
+        transport: z.enum(["stdio", "http"]).optional(),
+        http: z
+          .object({
+            baseUrl: z.string(),
+            headers: z.record(z.string(), z.string()).optional(),
+          })
+          .strict()
+          .optional(),
       })
       .strict()
       .optional(),
