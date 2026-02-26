@@ -124,7 +124,7 @@ that tracks online ingest:
 | Nodes vs Edges | Both metrics over time | Growth rate correlation. |
 | By Origin | `sum by (origin)` | Breakdown: `online_index` vs `manifest` vs `co_occurrence`. |
 
-### Jaeger traces
+### Traces (Tempo via Grafana)
 
 When OTel is enabled, each `qortex_ingest_message` call produces a trace
 showing:
@@ -134,8 +134,8 @@ showing:
 - Graph node/edge creation
 
 ```bash
-open http://localhost:16686
-# Search service "qortex", operation "qortex_ingest_message"
+open http://localhost:3010/explore
+# Select the Tempo datasource, search service "qortex", operation "qortex_ingest_message"
 ```
 
 ### Observability events
@@ -158,7 +158,7 @@ The qortex subprocess emits these events per ingest call:
 4. Ensure `QORTEX_GRAPH=memgraph` is set if you expect persistent storage.
 
 **High ingest latency:**
-- Embedding is usually the bottleneck. Check `vec.embed.*` spans in Jaeger.
+- Embedding is usually the bottleneck. Check `vec.embed.*` spans in Grafana Explore (Tempo datasource).
 - If using sentence-transformers, the first call loads the model (~2-5s).
   Subsequent calls are fast.
 

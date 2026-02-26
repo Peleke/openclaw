@@ -107,7 +107,7 @@ export async function createGatewayRuntimeState(params: {
   // Shared qortex connection: one process-wide connection for the entire gateway lifetime.
   // Used by learning API, learning select/observe (agent runs), memory search/get/feedback.
   // Eagerly initialized so it's ready before the first message arrives.
-  // Supports both stdio (subprocess) and HTTP (remote qortex serve) transports.
+  // Supports both stdio (subprocess) and REST HTTP (remote qortex serve) transports.
   try {
     const { QortexMcpConnection, parseCommandString, setSharedQortexConnection } =
       await import("../qortex/connection.js");
@@ -119,8 +119,8 @@ export async function createGatewayRuntimeState(params: {
 
     let sharedConn: import("../qortex/types.js").QortexConnection;
     if (transport === "http" && httpConfig) {
-      const { QortexHttpConnection } = await import("../qortex/http-connection.js");
-      sharedConn = new QortexHttpConnection(httpConfig.baseUrl, httpConfig.headers);
+      const { QortexRestConnection } = await import("../qortex/rest-connection.js");
+      sharedConn = new QortexRestConnection(httpConfig.baseUrl, httpConfig.headers);
     } else {
       const qortexCmd =
         learningCfg?.qortex?.command ?? memoryCfg?.qortex?.command ?? "uvx qortex mcp-serve";
