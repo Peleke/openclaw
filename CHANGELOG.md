@@ -5,8 +5,8 @@ Docs: https://docs.openclaw.ai
 ## 2026.2.25
 
 ### Features
-- Qortex: support MCP Streamable HTTP transport for gateway↔qortex connection, replacing stdio subprocess model. Set `memorySearch.qortex.transport: "http"` with `memorySearch.qortex.http.baseUrl` pointing at the qortex MCP service endpoint.
-- Qortex: `QortexHttpConnection` uses `StreamableHTTPClientTransport` from `@modelcontextprotocol/sdk` for persistent HTTP-based MCP communication.
+- Qortex: support plain REST HTTP transport for gateway↔qortex connection via `QortexRestConnection`, replacing stdio subprocess model. Set `memorySearch.qortex.transport: "http"` with `memorySearch.qortex.http.baseUrl` pointing at the qortex REST API base URL.
+- Qortex: `QortexRestConnection` uses `fetch()` for direct HTTP calls to qortex REST API endpoints (e.g., `POST /v1/query`, `POST /v1/ingest/message`). No MCP protocol layer in HTTP mode.
 
 ## 2026.2.16
 
