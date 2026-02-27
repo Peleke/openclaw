@@ -21,12 +21,15 @@ import {
   createInsightExtractorResponder,
   createInsightDigestResponder,
   createTelegramNotifierResponder,
+  createLinWheelPublisherResponder,
+  createGitHubWatcherResponder,
   createOpenClawLLMAdapter,
   registerResponders,
   type Responder,
   type Source,
   type OpenClawSignal,
 } from "../cadence/index.js";
+import { LinWheel } from "@linwheel/sdk";
 
 export interface CadenceGatewayState {
   bus: OpenClawBus;
@@ -145,7 +148,45 @@ async function setupP1ContentPipeline(log: SubsystemLogger): Promise<P1PipelineR
     log.warn(`cadence: P1 delivery channel '${p1Config.delivery.channel}' not fully configured`);
   }
 
-  // Cron Bridge (for scheduled digests)
+  // LinWheel Publisher (if API key available)
+  const linwheelApiKey = process.env.LINWHEEL_API_KEY?.trim();
+  if (linwheelApiKey) {
+    const linwheelClient = new LinWheel({
+      apiKey: linwheelApiKey,
+      ...(process.env.LINWHEEL_SIGNING_SECRET?.trim()
+        ? { signingSecret: process.env.LINWHEEL_SIGNING_SECRET.trim() }
+        : {}),
+      ...(process.env.LINWHEEL_BASE_URL?.trim()
+        ? { baseUrl: process.env.LINWHEEL_BASE_URL.trim() }
+        : {}),
+    });
+    responders.push(createLinWheelPublisherResponder({ client: linwheelClient }));
+    log.info("cadence: P1 LinWheel publisher enabled (::linkedin → drafts)");
+  } else {
+    log.debug("cadence: P1 LinWheel publisher skipped (no LINWHEEL_API_KEY)");
+  }
+
+  // GitHub Watcher (if enabled in config)
+  if (p1Config.githubWatcher?.enabled) {
+    responders.push(
+      createGitHubWatcherResponder({
+        llm: llmProvider,
+        vaultPath: p1Config.vaultPath,
+        config: {
+          owner: p1Config.githubWatcher.owner ?? "Peleke",
+          scanTime: p1Config.githubWatcher.scanTime ?? "21:00",
+          outputDir: p1Config.githubWatcher.outputDir ?? "Buildlog",
+          maxBuildlogEntries: p1Config.githubWatcher.maxBuildlogEntries ?? 3,
+          excludeRepos: p1Config.githubWatcher.excludeRepos ?? [],
+        },
+      }),
+    );
+    log.info("cadence: P1 GitHub watcher enabled (nightly scan → synthesis)");
+  } else {
+    log.debug("cadence: P1 GitHub watcher skipped (not enabled)");
+  }
+
+  // Cron Bridge (for scheduled digests + github watcher)
   const jobs = getScheduledJobs(p1Config);
   if (jobs.length > 0) {
     sources.push(createCronBridge({ jobs }));
