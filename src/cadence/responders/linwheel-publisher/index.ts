@@ -78,6 +78,7 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
       const runPipeline = async (pending: PendingPublish): Promise<void> => {
         const { path: filePath, content, angles } = pending;
 
+        let step = "analyze";
         try {
           // 1. Analyze — get fit score + suggested angles
           const analysis = (await client.analyze({ text: content })) as {
@@ -96,6 +97,7 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
               : angles;
 
           // 2. Reshape — generate drafts, save to LinWheel
+          step = "reshape";
           const finalAngles = (
             reshapeAngles.length > 0 ? reshapeAngles : config.defaultAngles
           ) as PostAngle[];
@@ -103,10 +105,11 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
             text: content,
             angles: finalAngles,
             saveDrafts: config.saveDrafts,
-          })) as { posts?: Array<{ text: string; postId?: string }> };
+          })) as { posts?: Array<{ text: string }>; postIds?: string[] };
 
           const postCount = result.posts?.length ?? 0;
-          log.info(`Generated ${postCount} drafts from ${filePath}`);
+          const savedCount = result.postIds?.length ?? 0;
+          log.info(`Generated ${postCount} drafts from ${filePath} (${savedCount} saved)`);
 
           // Emit signal for downstream consumers (telegram notifier, etc.)
           await bus.emit({
@@ -119,10 +122,30 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
               angles: reshapeAngles.length > 0 ? reshapeAngles : config.defaultAngles,
             },
           });
-        } catch (err) {
-          log.error(
-            `LinWheel pipeline failed for ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+        } catch (err: unknown) {
+          const base = `LinWheel pipeline failed at ${step} for ${filePath}`;
+          if (err && typeof err === "object" && "statusCode" in err) {
+            const apiErr = err as { statusCode: number; responseBody?: unknown; message?: string };
+            log.error(`${base}: HTTP ${apiErr.statusCode} — ${apiErr.message ?? "unknown"}`, {
+              statusCode: apiErr.statusCode,
+              responseBody: apiErr.responseBody,
+            });
+          } else {
+            log.error(`${base}: ${err instanceof Error ? err.message : String(err)}`);
+          }
+
+          // Emit failure signal so downstream consumers (telegram, etc.) can surface it
+          await bus.emit({
+            type: "linwheel.drafts.generated",
+            id: crypto.randomUUID(),
+            ts: Date.now(),
+            payload: {
+              noteFile: filePath,
+              postsCreated: 0,
+              angles: [],
+              error: err instanceof Error ? err.message : String(err),
+            },
+          });
         }
       };
 

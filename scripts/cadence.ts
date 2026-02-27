@@ -36,6 +36,8 @@ import { createInsightExtractorResponder } from "../src/cadence/responders/insig
 import { createInsightDigestResponder } from "../src/cadence/responders/insight-digest/index.js";
 import { createTelegramNotifierResponder } from "../src/cadence/responders/telegram-notifier.js";
 import { createFileLogResponder } from "../src/cadence/responders/file-log.js";
+import { createLinWheelPublisherResponder } from "../src/cadence/responders/linwheel-publisher/index.js";
+import { LinWheel } from "@linwheel/sdk";
 import { createOpenClawLLMAdapter } from "../src/cadence/llm/index.js";
 
 const COMMANDS = ["init", "config", "start", "status", "digest", "test", "help"] as const;
@@ -234,6 +236,23 @@ async function cmdStart() {
     fileLogResponder = createFileLogResponder({ filePath: fileLogPath });
   }
 
+  // 7. LinWheel publisher responder (if API key available)
+  let linwheelResponder;
+  const linwheelApiKey = process.env.LINWHEEL_API_KEY?.trim();
+  if (linwheelApiKey) {
+    const linwheelClient = new LinWheel({
+      apiKey: linwheelApiKey,
+      ...(process.env.LINWHEEL_SIGNING_SECRET?.trim()
+        ? { signingSecret: process.env.LINWHEEL_SIGNING_SECRET.trim() }
+        : {}),
+      ...(process.env.LINWHEEL_BASE_URL?.trim()
+        ? { baseUrl: process.env.LINWHEEL_BASE_URL.trim() }
+        : {}),
+    });
+    linwheelResponder = createLinWheelPublisherResponder({ client: linwheelClient });
+    console.log("🔗 LinWheel publisher enabled (::linkedin → drafts)");
+  }
+
   // Wire up logging
   bus.on("obsidian.note.modified", (signal) => {
     const filename = signal.payload.path.split("/").pop();
@@ -271,6 +290,9 @@ async function cmdStart() {
   }
   if (fileLogResponder) {
     unsubs.push(fileLogResponder.register(bus));
+  }
+  if (linwheelResponder) {
+    unsubs.push(linwheelResponder.register(bus));
   }
 
   // Start sources

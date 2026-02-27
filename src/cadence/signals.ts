@@ -137,6 +137,8 @@ export type OpenClawPayloadMap = {
     noteFile: string;
     postsCreated: number;
     angles: string[];
+    /** Present when the pipeline failed — contains the error message */
+    error?: string;
   };
 
   /** Scheduled job fired (cron) */
