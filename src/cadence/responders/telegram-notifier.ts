@@ -4,6 +4,7 @@
  * Handles:
  * - obsidian.note.modified → basic file change notification
  * - journal.digest.ready → formatted insight digest delivery
+ * - github.synthesis.written → GitHub watcher synthesis notification
  */
 
 import type { SignalBus } from "@peleke.s/cadence";
@@ -23,6 +24,8 @@ export interface TelegramNotifierConfig {
   notifyOnFileChange?: boolean;
   /** Whether to deliver insight digests (default: true) */
   deliverDigests?: boolean;
+  /** Whether to notify on GitHub synthesis completion (default: true) */
+  notifyOnGitHubSynthesis?: boolean;
 }
 
 /**
@@ -128,6 +131,41 @@ export function createTelegramNotifierResponder(config: TelegramNotifierConfig):
           }
         });
         unsubscribers.push(unsubDigest);
+      }
+
+      // GitHub synthesis notifications
+      {
+        const notifyOnGitHubSynthesis = config.notifyOnGitHubSynthesis ?? true;
+        if (notifyOnGitHubSynthesis) {
+          const unsubGitHub = bus.on("github.synthesis.written", async (signal) => {
+            const { scanDate, reposIncluded, totalPRs, linkedinReady, error } = signal.payload;
+
+            let message: string;
+            if (error) {
+              message = `⚠️ GitHub Watcher failed for ${scanDate}: \`${error}\``;
+            } else {
+              message = [
+                `🐙 *GitHub Synthesis Ready*`,
+                "",
+                `Date: ${scanDate}`,
+                `Repos: ${reposIncluded} · PRs: ${totalPRs}`,
+                linkedinReady ? "LinkedIn draft incoming\\.\\.\\." : "",
+              ]
+                .filter(Boolean)
+                .join("\n");
+            }
+
+            try {
+              await sendMessageTelegram(telegramChatId, message, {
+                accountId: telegramAccountId,
+                textMode: "markdown",
+              });
+            } catch (err) {
+              log.error(`Failed to send GitHub synthesis notification: ${err}`);
+            }
+          });
+          unsubscribers.push(unsubGitHub);
+        }
       }
 
       // Return combined cleanup

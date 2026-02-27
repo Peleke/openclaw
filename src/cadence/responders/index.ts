@@ -48,3 +48,4 @@ export {
   type LinWheelPublisherConfig,
   DEFAULT_PUBLISHER_CONFIG,
 } from "./linwheel-publisher/types.js";
+export { createGitHubWatcherResponder, type GitHubWatcherOptions } from "./github-watcher/index.js";

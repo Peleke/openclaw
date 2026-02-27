@@ -71,6 +71,22 @@ export interface CadenceP1Config {
     /** Timezone */
     timezone: string;
   };
+
+  /** GitHub Watcher settings (nightly repo scan + synthesis) */
+  githubWatcher?: {
+    /** Enable the GitHub watcher (default: false) */
+    enabled: boolean;
+    /** GitHub username to scan (default: "Peleke") */
+    owner?: string;
+    /** Scan time in HH:MM format (default: "21:00") */
+    scanTime?: string;
+    /** Output directory within vault (default: "Buildlog") */
+    outputDir?: string;
+    /** Max buildlog entries per repo (default: 3) */
+    maxBuildlogEntries?: number;
+    /** Repos to exclude from scanning */
+    excludeRepos?: string[];
+  };
 }
 
 export const DEFAULT_CONFIG: CadenceP1Config = {
@@ -137,6 +153,7 @@ export async function loadCadenceConfig(): Promise<CadenceP1Config> {
       digest: { ...DEFAULT_CONFIG.digest, ...parsed.digest },
       schedule: { ...DEFAULT_CONFIG.schedule, ...parsed.schedule },
       pillars: parsed.pillars ?? DEFAULT_CONFIG.pillars,
+      githubWatcher: parsed.githubWatcher,
     };
   } catch {
     return DEFAULT_CONFIG;
@@ -187,24 +204,34 @@ export function getScheduledJobs(config: CadenceP1Config): Array<{
 }> {
   const jobs: Array<{ id: string; name: string; expr: string; tz: string }> = [];
 
-  if (!config.schedule.enabled) {
-    return jobs;
+  if (config.schedule.enabled) {
+    if (config.schedule.nightlyDigest) {
+      jobs.push({
+        id: "nightly-digest",
+        name: "Nightly Digest",
+        expr: timeToCron(config.schedule.nightlyDigest),
+        tz: config.schedule.timezone,
+      });
+    }
+
+    if (config.schedule.morningStandup) {
+      jobs.push({
+        id: "morning-standup",
+        name: "Morning Standup",
+        expr: timeToCron(config.schedule.morningStandup),
+        tz: config.schedule.timezone,
+      });
+    }
   }
 
-  if (config.schedule.nightlyDigest) {
+  // GitHub Watcher has its own enabled flag, independent of schedule.enabled
+  const ghw = config.githubWatcher;
+  if (ghw?.enabled) {
+    const scanTime = ghw.scanTime ?? "21:00";
     jobs.push({
-      id: "nightly-digest",
-      name: "Nightly Digest",
-      expr: timeToCron(config.schedule.nightlyDigest),
-      tz: config.schedule.timezone,
-    });
-  }
-
-  if (config.schedule.morningStandup) {
-    jobs.push({
-      id: "morning-standup",
-      name: "Morning Standup",
-      expr: timeToCron(config.schedule.morningStandup),
+      id: "github-watcher",
+      name: "GitHub Watcher",
+      expr: timeToCron(scanTime),
       tz: config.schedule.timezone,
     });
   }
