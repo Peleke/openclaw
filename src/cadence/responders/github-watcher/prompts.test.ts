@@ -93,7 +93,7 @@ describe("buildSynthesisUserPrompt", () => {
   it("handles empty repos array", () => {
     const prompt = buildSynthesisUserPrompt([], "2026-02-26");
     expect(prompt).toContain("2026-02-26");
-    expect(prompt).toContain("Synthesize");
+    expect(prompt).toContain("beats");
   });
 });
 
