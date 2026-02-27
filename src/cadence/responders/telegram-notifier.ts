@@ -23,6 +23,10 @@ export interface TelegramNotifierConfig {
   notifyOnFileChange?: boolean;
   /** Whether to deliver insight digests (default: true) */
   deliverDigests?: boolean;
+  /** Whether to notify on LinWheel draft generation (default: true) */
+  notifyOnLinWheelDrafts?: boolean;
+  /** Dashboard URL for LinWheel draft links */
+  linwheelDashboardUrl?: string;
 }
 
 /**
@@ -67,6 +71,8 @@ export function createTelegramNotifierResponder(config: TelegramNotifierConfig):
     telegramAccountId,
     notifyOnFileChange = false,
     deliverDigests = true,
+    notifyOnLinWheelDrafts = true,
+    linwheelDashboardUrl = "https://linwheel.io/dashboard",
   } = config;
 
   return {
@@ -128,6 +134,39 @@ export function createTelegramNotifierResponder(config: TelegramNotifierConfig):
           }
         });
         unsubscribers.push(unsubDigest);
+      }
+
+      // LinWheel draft generation notifications
+      if (notifyOnLinWheelDrafts) {
+        const unsubLinWheel = bus.on("linwheel.drafts.generated", async (signal) => {
+          const { noteFile, postsCreated, error } = signal.payload;
+          const filename = noteFile.split("/").pop() ?? noteFile;
+
+          let message: string;
+          if (error) {
+            message = `⚠️ LinWheel failed for *${filename}*\n\n\`${error}\``;
+          } else if (postsCreated === 0) {
+            return; // Nothing generated, skip notification
+          } else {
+            message = [
+              `✍️ *${postsCreated} draft${postsCreated === 1 ? "" : "s"} ready*`,
+              "",
+              `From: _${filename}_`,
+              "",
+              `[Review in dashboard →](${linwheelDashboardUrl})`,
+            ].join("\n");
+          }
+
+          try {
+            await sendMessageTelegram(telegramChatId, message, {
+              accountId: telegramAccountId,
+              textMode: "markdown",
+            });
+          } catch (err) {
+            log.error(`Failed to send LinWheel notification: ${err}`);
+          }
+        });
+        unsubscribers.push(unsubLinWheel);
       }
 
       // Return combined cleanup
