@@ -36,6 +36,7 @@ import { createInsightExtractorResponder } from "../src/cadence/responders/insig
 import { createInsightDigestResponder } from "../src/cadence/responders/insight-digest/index.js";
 import { createTelegramNotifierResponder } from "../src/cadence/responders/telegram-notifier.js";
 import { createFileLogResponder } from "../src/cadence/responders/file-log.js";
+import { createGitHubWatcherResponder } from "../src/cadence/responders/github-watcher/index.js";
 import { createOpenClawLLMAdapter } from "../src/cadence/llm/index.js";
 
 const COMMANDS = ["init", "config", "start", "status", "digest", "test", "help"] as const;
@@ -234,6 +235,23 @@ async function cmdStart() {
     fileLogResponder = createFileLogResponder({ filePath: fileLogPath });
   }
 
+  // 7. GitHub watcher responder (nightly repo scan + synthesis)
+  let githubWatcherResponder;
+  if (config.githubWatcher?.enabled) {
+    githubWatcherResponder = createGitHubWatcherResponder({
+      llm: llmProvider,
+      vaultPath: config.vaultPath,
+      config: {
+        owner: config.githubWatcher.owner ?? "Peleke",
+        scanTime: config.githubWatcher.scanTime ?? "21:00",
+        outputDir: config.githubWatcher.outputDir ?? "Buildlog",
+        maxBuildlogEntries: config.githubWatcher.maxBuildlogEntries ?? 3,
+        excludeRepos: config.githubWatcher.excludeRepos ?? [],
+      },
+    });
+    console.log("🐙 GitHub watcher enabled (nightly scan → synthesis)");
+  }
+
   // Wire up logging
   bus.on("obsidian.note.modified", (signal) => {
     const filename = signal.payload.path.split("/").pop();
@@ -262,6 +280,27 @@ async function cmdStart() {
     }
   });
 
+  bus.on("github.scan.completed", (signal) => {
+    const { reposScanned, reposWithActivity, errors } = signal.payload;
+    console.log(
+      `🐙 [${timestamp()}] GitHub scan: ${reposScanned} repos, ${reposWithActivity} with activity`,
+    );
+    if (errors.length > 0) {
+      console.log(`   ⚠️  ${errors.length} error(s)`);
+    }
+  });
+
+  bus.on("github.synthesis.written", (signal) => {
+    const { scanDate, reposIncluded, totalPRs, linkedinReady, error } = signal.payload;
+    if (error) {
+      console.log(`❌ [${timestamp()}] GitHub synthesis failed: ${error}`);
+    } else {
+      console.log(
+        `📝 [${timestamp()}] GitHub synthesis written: ${reposIncluded} repos, ${totalPRs} PRs${linkedinReady ? " (::linkedin)" : ""}`,
+      );
+    }
+  });
+
   // Register responders
   const unsubs: Array<() => void> = [];
   unsubs.push(extractorResponder.register(bus));
@@ -271,6 +310,9 @@ async function cmdStart() {
   }
   if (fileLogResponder) {
     unsubs.push(fileLogResponder.register(bus));
+  }
+  if (githubWatcherResponder) {
+    unsubs.push(githubWatcherResponder.register(bus));
   }
 
   // Start sources

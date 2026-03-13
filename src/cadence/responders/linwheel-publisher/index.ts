@@ -134,7 +134,12 @@ export function createLinWheelPublisherResponder(options: LinWheelPublisherOptio
           return;
         }
 
-        const filterResult = shouldExtract(content, {
+        // Strip YAML frontmatter before magic string detection.
+        // ObsidianWatcher passes raw content including frontmatter, but
+        // shouldExtract expects content starting at the first real line.
+        const contentBody = content.replace(/^---\n[\s\S]*?\n---\n?/, "");
+
+        const filterResult = shouldExtract(contentBody, {
           magicString: config.magicString,
           minContentLength: config.minContentLength,
         });

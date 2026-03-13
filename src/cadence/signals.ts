@@ -147,6 +147,53 @@ export type OpenClawPayloadMap = {
     firedAt: number;
     tz?: string;
   };
+
+  /** GitHub scan completed (observability) */
+  "github.scan.completed": {
+    scanDate: string;
+    reposScanned: number;
+    reposWithActivity: number;
+    reposWithBuildlog: number;
+    repos: Array<{
+      name: string;
+      fullName: string;
+      mergedPRs: Array<{ number: number; title: string; url: string }>;
+      openPRs: Array<{ number: number; title: string; url: string }>;
+      buildlogEntries: Array<{ name: string; content: string }>;
+    }>;
+    errors: Array<{ repo: string; error: string }>;
+  };
+
+  /** GitHub synthesis written to vault */
+  "github.synthesis.written": {
+    outputPath: string;
+    scanDate: string;
+    reposIncluded: number;
+    totalPRs: number;
+    linkedinReady: boolean;
+    error?: string;
+  };
+
+  /** Runlist morning ping sent via Telegram */
+  "runlist.morning.sent": {
+    date: string;
+    focus: string;
+    counts: {
+      do_first: number;
+      block_time: number;
+      batch: number;
+      kill: number;
+    };
+    carried_count: number;
+  };
+
+  /** Runlist nightly recap sent via Telegram */
+  "runlist.nightly.sent": {
+    date: string;
+    completed: number;
+    pending: number;
+    forcedDecisions: string[];
+  };
 };
 
 /**

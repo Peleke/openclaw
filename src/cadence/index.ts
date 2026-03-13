@@ -38,6 +38,14 @@ export {
 export { createInsightExtractorResponder } from "./responders/insight-extractor/index.js";
 export { createInsightDigestResponder } from "./responders/insight-digest/index.js";
 export { createTelegramNotifierResponder } from "./responders/telegram-notifier.js";
+export {
+  createLinWheelPublisherResponder,
+  type LinWheelPublisherOptions,
+} from "./responders/linwheel-publisher/index.js";
+export {
+  createGitHubWatcherResponder,
+  type GitHubWatcherOptions,
+} from "./responders/github-watcher/index.js";
 
 // LLM
 export { createOpenClawLLMAdapter, createMockLLMProvider } from "./llm/openclaw-adapter.js";
