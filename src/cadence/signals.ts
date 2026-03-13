@@ -173,6 +173,27 @@ export type OpenClawPayloadMap = {
     linkedinReady: boolean;
     error?: string;
   };
+
+  /** Runlist morning ping sent via Telegram */
+  "runlist.morning.sent": {
+    date: string;
+    focus: string;
+    counts: {
+      do_first: number;
+      block_time: number;
+      batch: number;
+      kill: number;
+    };
+    carried_count: number;
+  };
+
+  /** Runlist nightly recap sent via Telegram */
+  "runlist.nightly.sent": {
+    date: string;
+    completed: number;
+    pending: number;
+    forcedDecisions: string[];
+  };
 };
 
 /**

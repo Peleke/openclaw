@@ -72,6 +72,18 @@ export interface CadenceP1Config {
     timezone: string;
   };
 
+  /** Runlist responder settings (morning ping + nightly recap) */
+  runlist?: {
+    /** Enable the runlist responder (default: false) */
+    enabled: boolean;
+    /** Morning ping time in HH:MM format (default: "07:30") */
+    morningTime?: string;
+    /** Nightly recap time in HH:MM format (default: "22:00") */
+    nightlyTime?: string;
+    /** Directory within vault containing runlist files (default: "Runlist") */
+    runlistDir?: string;
+  };
+
   /** GitHub Watcher settings (nightly repo scan + synthesis) */
   githubWatcher?: {
     /** Enable the GitHub watcher (default: false) */
@@ -153,6 +165,7 @@ export async function loadCadenceConfig(): Promise<CadenceP1Config> {
       digest: { ...DEFAULT_CONFIG.digest, ...parsed.digest },
       schedule: { ...DEFAULT_CONFIG.schedule, ...parsed.schedule },
       pillars: parsed.pillars ?? DEFAULT_CONFIG.pillars,
+      runlist: parsed.runlist,
       githubWatcher: parsed.githubWatcher,
     };
   } catch {
@@ -222,6 +235,22 @@ export function getScheduledJobs(config: CadenceP1Config): Array<{
         tz: config.schedule.timezone,
       });
     }
+  }
+
+  // Runlist responder has its own enabled flag, independent of schedule.enabled
+  if (config.runlist?.enabled) {
+    jobs.push({
+      id: "runlist-morning",
+      name: "Runlist Morning Ping",
+      expr: timeToCron(config.runlist.morningTime ?? "07:30"),
+      tz: config.schedule.timezone,
+    });
+    jobs.push({
+      id: "runlist-nightly",
+      name: "Runlist Nightly Recap",
+      expr: timeToCron(config.runlist.nightlyTime ?? "22:00"),
+      tz: config.schedule.timezone,
+    });
   }
 
   // GitHub Watcher has its own enabled flag, independent of schedule.enabled

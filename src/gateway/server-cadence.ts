@@ -23,6 +23,7 @@ import {
   createTelegramNotifierResponder,
   createLinWheelPublisherResponder,
   createGitHubWatcherResponder,
+  createRunlistResponder,
   createOpenClawLLMAdapter,
   registerResponders,
   type Responder,
@@ -184,6 +185,20 @@ async function setupP1ContentPipeline(log: SubsystemLogger): Promise<P1PipelineR
     log.info("cadence: P1 GitHub watcher enabled (nightly scan → synthesis)");
   } else {
     log.debug("cadence: P1 GitHub watcher skipped (not enabled)");
+  }
+
+  // Runlist Responder (morning ping + nightly recap)
+  if (p1Config.runlist?.enabled && p1Config.delivery.telegramChatId) {
+    responders.push(
+      createRunlistResponder({
+        vaultPath: p1Config.vaultPath,
+        telegramChatId: p1Config.delivery.telegramChatId,
+        runlistDir: p1Config.runlist.runlistDir,
+      }),
+    );
+    log.info("cadence: P1 Runlist responder enabled (morning + nightly)");
+  } else if (p1Config.runlist?.enabled) {
+    log.warn("cadence: P1 Runlist enabled but no telegramChatId configured");
   }
 
   // Cron Bridge (for scheduled digests + github watcher)
