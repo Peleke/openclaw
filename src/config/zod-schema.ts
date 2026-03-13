@@ -303,6 +303,20 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    cadence: z
+      .object({
+        enabled: z.boolean().optional(),
+        timezone: z.string().optional(),
+        vaultPath: z.string().optional(),
+        dailyNotePath: z.string().optional(),
+        channel: z.string().optional(),
+        to: z.string().optional(),
+        maxNudgesPerBlock: z.number().int().positive().optional(),
+        nudgeBackoff: z.string().optional(),
+        blocks: z.array(z.record(z.string(), z.unknown())).optional(),
+      })
+      .strict()
+      .optional(),
     learning: LearningSchema,
     green: GreenSchema,
     gateway: z
