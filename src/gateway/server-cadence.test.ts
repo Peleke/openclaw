@@ -23,8 +23,15 @@ vi.mock("../cadence/index.js", () => ({
   createInsightExtractorResponder: vi.fn(),
   createInsightDigestResponder: vi.fn(),
   createTelegramNotifierResponder: vi.fn(),
+  createLinWheelPublisherResponder: vi.fn(),
+  createGitHubWatcherResponder: vi.fn(),
+  createRunlistResponder: vi.fn(),
   createOpenClawLLMAdapter: vi.fn(),
   registerResponders: vi.fn(),
+}));
+
+vi.mock("@linwheel/sdk", () => ({
+  LinWheel: vi.fn(),
 }));
 
 import { startGatewayCadence, getGatewayCadenceBus } from "./server-cadence.js";
@@ -40,6 +47,9 @@ import {
   createInsightExtractorResponder,
   createInsightDigestResponder,
   createTelegramNotifierResponder,
+  createLinWheelPublisherResponder,
+  createGitHubWatcherResponder,
+  createRunlistResponder,
   createOpenClawLLMAdapter,
   registerResponders,
 } from "../cadence/index.js";
@@ -59,6 +69,11 @@ const mockCreateInsightDigestResponder = createInsightDigestResponder as ReturnT
 const mockCreateTelegramNotifierResponder = createTelegramNotifierResponder as ReturnType<
   typeof vi.fn
 >;
+const mockCreateLinWheelPublisherResponder = createLinWheelPublisherResponder as ReturnType<
+  typeof vi.fn
+>;
+const mockCreateGitHubWatcherResponder = createGitHubWatcherResponder as ReturnType<typeof vi.fn>;
+const mockCreateRunlistResponder = createRunlistResponder as ReturnType<typeof vi.fn>;
 const mockCreateOpenClawLLMAdapter = createOpenClawLLMAdapter as ReturnType<typeof vi.fn>;
 const mockRegisterResponders = registerResponders as ReturnType<typeof vi.fn>;
 
@@ -130,6 +145,9 @@ describe("startGatewayCadence", () => {
     mockCreateInsightExtractorResponder.mockReturnValue({ name: "insight-extractor" });
     mockCreateInsightDigestResponder.mockReturnValue({ name: "insight-digest" });
     mockCreateTelegramNotifierResponder.mockReturnValue({ name: "telegram-notifier" });
+    mockCreateLinWheelPublisherResponder.mockReturnValue({ name: "linwheel-publisher" });
+    mockCreateGitHubWatcherResponder.mockReturnValue({ name: "github-watcher" });
+    mockCreateRunlistResponder.mockReturnValue({ name: "runlist" });
     mockCreateOpenClawLLMAdapter.mockReturnValue({ name: "openclaw-llm" });
     mockGetScheduledJobs.mockReturnValue([
       { id: "nightly-digest", name: "Nightly Digest", expr: "0 21 * * *", tz: "America/New_York" },
@@ -552,6 +570,180 @@ describe("startGatewayCadence", () => {
 
       expect(result).not.toBeNull();
       expect(result!.bus).toBe(mockBus);
+    });
+  });
+
+  describe("LinWheel publisher registration", () => {
+    it("creates LinWheel publisher when LINWHEEL_API_KEY is set", async () => {
+      const origKey = process.env.LINWHEEL_API_KEY;
+      process.env.LINWHEEL_API_KEY = "lw_sk_test_key";
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateLinWheelPublisherResponder).toHaveBeenCalled();
+      process.env.LINWHEEL_API_KEY = origKey;
+    });
+
+    it("skips LinWheel publisher when LINWHEEL_API_KEY is not set", async () => {
+      const origKey = process.env.LINWHEEL_API_KEY;
+      delete process.env.LINWHEEL_API_KEY;
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
+      process.env.LINWHEEL_API_KEY = origKey;
+    });
+
+    it("skips LinWheel publisher when LINWHEEL_API_KEY is empty", async () => {
+      const origKey = process.env.LINWHEEL_API_KEY;
+      process.env.LINWHEEL_API_KEY = "";
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
+      process.env.LINWHEEL_API_KEY = origKey;
+    });
+
+    it("skips LinWheel publisher when LINWHEEL_API_KEY is whitespace", async () => {
+      const origKey = process.env.LINWHEEL_API_KEY;
+      process.env.LINWHEEL_API_KEY = "   ";
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
+      process.env.LINWHEEL_API_KEY = origKey;
+    });
+  });
+
+  describe("GitHub watcher registration", () => {
+    it("creates GitHub watcher when githubWatcher.enabled is true", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(
+        createMockP1Config({
+          githubWatcher: { enabled: true, owner: "TestOrg", scanTime: "20:00" },
+        }),
+      );
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateGitHubWatcherResponder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vaultPath: "/test/vault",
+          config: expect.objectContaining({
+            owner: "TestOrg",
+            scanTime: "20:00",
+          }),
+        }),
+      );
+    });
+
+    it("skips GitHub watcher when githubWatcher is undefined", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateGitHubWatcherResponder).not.toHaveBeenCalled();
+    });
+
+    it("skips GitHub watcher when githubWatcher.enabled is false", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(
+        createMockP1Config({ githubWatcher: { enabled: false } }),
+      );
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateGitHubWatcherResponder).not.toHaveBeenCalled();
+    });
+
+    it("uses default values for optional GitHub watcher fields", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(
+        createMockP1Config({ githubWatcher: { enabled: true } }),
+      );
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateGitHubWatcherResponder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          config: expect.objectContaining({
+            owner: "Peleke",
+            scanTime: "21:00",
+            outputDir: "Buildlog",
+            maxBuildlogEntries: 3,
+            excludeRepos: [],
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Runlist responder registration", () => {
+    it("creates Runlist responder when runlist.enabled and telegramChatId set", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(
+        createMockP1Config({
+          runlist: { enabled: true, runlistDir: "Runlist" },
+        }),
+      );
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateRunlistResponder).toHaveBeenCalledWith(
+        expect.objectContaining({
+          vaultPath: "/test/vault",
+          telegramChatId: "123456",
+          runlistDir: "Runlist",
+        }),
+      );
+    });
+
+    it("warns when runlist.enabled but no telegramChatId", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(
+        createMockP1Config({
+          runlist: { enabled: true },
+          delivery: { channel: "log" },
+        }),
+      );
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateRunlistResponder).not.toHaveBeenCalled();
+      expect(mockLog.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Runlist enabled but no telegramChatId"),
+      );
+    });
+
+    it("skips Runlist when runlist is not in config", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockCreateRunlistResponder).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("duplicate-process warning", () => {
+    it("logs warning when cadence is enabled via gateway config", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(mockLog.warn).toHaveBeenCalledWith(
+        expect.stringContaining("Ensure the openclaw-cadence.service"),
+      );
     });
   });
 });

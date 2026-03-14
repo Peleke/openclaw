@@ -251,6 +251,58 @@ describe("LinWheelPublisherResponder", () => {
     unsub();
   });
 
+  it("strips YAML frontmatter before detecting ::linkedin", async () => {
+    const responder = createLinWheelPublisherResponder({ client, config: { debounceMs: 100 } });
+    const unsub = responder.register(bus);
+
+    const content =
+      "---\ntitle: Test Note\ntags: [ai, cadence]\n---\n::linkedin\n\n" +
+      "Today I shipped the Cadence pipeline. It connects ambient file watching to content generation.";
+    await bus.emit(noteSignal(content));
+
+    vi.advanceTimersByTime(200);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(client.analyze).toHaveBeenCalledTimes(1);
+    expect(client.analyze).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining("shipped the Cadence pipeline") }),
+    );
+
+    unsub();
+  });
+
+  it("handles frontmatter with nested YAML values", async () => {
+    const responder = createLinWheelPublisherResponder({ client, config: { debounceMs: 100 } });
+    const unsub = responder.register(bus);
+
+    const content =
+      "---\ntitle: Complex\ntags:\n  - foo\n  - bar\ncount: 42\n---\n::linkedin\n\n" +
+      "A".repeat(100);
+    await bus.emit(noteSignal(content));
+
+    vi.advanceTimersByTime(200);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(client.analyze).toHaveBeenCalledTimes(1);
+    unsub();
+  });
+
+  it("does not detect ::linkedin inside unclosed frontmatter", async () => {
+    const responder = createLinWheelPublisherResponder({ client, config: { debounceMs: 100 } });
+    const unsub = responder.register(bus);
+
+    // Missing closing --- means the regex won't strip anything,
+    // so ::linkedin is on line 3 (not line 1), and should not be detected
+    const content = "---\ntitle: Broken\n::linkedin\n\n" + "B".repeat(100);
+    await bus.emit(noteSignal(content));
+
+    vi.advanceTimersByTime(200);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(client.analyze).not.toHaveBeenCalled();
+    unsub();
+  });
+
   it("handles SDK errors gracefully without crashing", async () => {
     (client.analyze as ReturnType<typeof vi.fn>).mockRejectedValue(new Error("API down"));
 

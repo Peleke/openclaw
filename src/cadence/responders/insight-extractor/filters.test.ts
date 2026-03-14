@@ -227,6 +227,55 @@ describe("shouldExtract", () => {
   });
 });
 
+describe("shouldExtract with ::linkedin magic string", () => {
+  const linkedinConfig = {
+    magicString: "::linkedin",
+    minContentLength: 50,
+  };
+
+  it("accepts content with ::linkedin marker and sufficient length", () => {
+    const result = shouldExtract(
+      "::linkedin\n\nToday I shipped a TypeScript SDK. It wraps 13 REST endpoints with typed interfaces.",
+      linkedinConfig,
+    );
+    expect(result.shouldExtract).toBe(true);
+    expect(result.content).toContain("shipped a TypeScript SDK");
+  });
+
+  it("rejects content with ::publish when expecting ::linkedin", () => {
+    const result = shouldExtract(
+      "::publish\n\nThis content uses the wrong magic string for LinkedIn publishing.",
+      linkedinConfig,
+    );
+    expect(result.shouldExtract).toBe(false);
+    expect(result.reason).toBe("Missing magic string");
+  });
+
+  it("rejects ::linkedin with insufficient content", () => {
+    const result = shouldExtract("::linkedin\n\nToo short", linkedinConfig);
+    expect(result.shouldExtract).toBe(false);
+    expect(result.reason).toContain("Content too short");
+  });
+
+  it("handles ::linkedin on line 2 after markdown heading", () => {
+    const result = shouldExtract(
+      "# Daily Buildlog\n::linkedin\n\nToday I shipped the Cadence pipeline connecting ambient file watching to content generation.",
+      linkedinConfig,
+    );
+    expect(result.shouldExtract).toBe(true);
+    expect(result.content).toContain("Daily Buildlog");
+  });
+
+  it("works with YAML frontmatter stripped before checking", () => {
+    // This mirrors what LinWheel publisher does: strip frontmatter, then check
+    const raw =
+      "---\ntitle: Test\ntags: [ai]\n---\n::linkedin\n\nContent that is long enough to pass the minimum content length threshold for extraction.";
+    const stripped = raw.replace(/^---\n[\s\S]*?\n---\n?/, "");
+    const result = shouldExtract(stripped, linkedinConfig);
+    expect(result.shouldExtract).toBe(true);
+  });
+});
+
 describe("extractPillarHint", () => {
   it("extracts string pillar value", () => {
     const result = extractPillarHint({ pillar: "norse" });
