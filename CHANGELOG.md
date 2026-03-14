@@ -2,6 +2,13 @@
 
 Docs: https://docs.openclaw.ai
 
+## 2026.3.14
+
+### Fixes
+- Cadence: register LinWheel publisher and Runlist responder in dogfood script (`scripts/cadence.ts`) — previously only available in the gateway path, so `::linkedin`-tagged GitHub synthesis notes never triggered LinWheel draft generation. (#105)
+- Cadence: export `createRunlistResponder` from cadence barrel module — `server-cadence.ts` imported it but the barrel didn't re-export it. (#105)
+- Cadence: add duplicate-process warning when gateway cadence is enabled alongside the dogfood script. (#105)
+
 ## 2026.2.25
 
 ### Features
