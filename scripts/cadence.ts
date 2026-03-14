@@ -37,7 +37,10 @@ import { createInsightDigestResponder } from "../src/cadence/responders/insight-
 import { createTelegramNotifierResponder } from "../src/cadence/responders/telegram-notifier.js";
 import { createFileLogResponder } from "../src/cadence/responders/file-log.js";
 import { createGitHubWatcherResponder } from "../src/cadence/responders/github-watcher/index.js";
+import { createLinWheelPublisherResponder } from "../src/cadence/responders/linwheel-publisher/index.js";
+import { createRunlistResponder } from "../src/cadence/responders/runlist/index.js";
 import { createOpenClawLLMAdapter } from "../src/cadence/llm/index.js";
+import { LinWheel } from "@linwheel/sdk";
 
 const COMMANDS = ["init", "config", "start", "status", "digest", "test", "help"] as const;
 type Command = (typeof COMMANDS)[number];
@@ -252,6 +255,38 @@ async function cmdStart() {
     console.log("🐙 GitHub watcher enabled (nightly scan → synthesis)");
   }
 
+  // 8. LinWheel publisher responder (::linkedin → drafts)
+  let linwheelPublisherResponder;
+  const linwheelApiKey = process.env.LINWHEEL_API_KEY?.trim();
+  if (linwheelApiKey) {
+    const linwheelClient = new LinWheel({
+      apiKey: linwheelApiKey,
+      ...(process.env.LINWHEEL_SIGNING_SECRET?.trim()
+        ? { signingSecret: process.env.LINWHEEL_SIGNING_SECRET.trim() }
+        : {}),
+      ...(process.env.LINWHEEL_BASE_URL?.trim()
+        ? { baseUrl: process.env.LINWHEEL_BASE_URL.trim() }
+        : {}),
+    });
+    linwheelPublisherResponder = createLinWheelPublisherResponder({
+      client: linwheelClient,
+    });
+    console.log("📎 LinWheel publisher enabled (::linkedin → drafts)");
+  } else {
+    console.log("📎 LinWheel publisher skipped (no LINWHEEL_API_KEY)");
+  }
+
+  // 9. Runlist responder (morning ping + nightly recap)
+  let runlistResponder;
+  if (config.runlist?.enabled && config.delivery.telegramChatId) {
+    runlistResponder = createRunlistResponder({
+      vaultPath: config.vaultPath,
+      telegramChatId: config.delivery.telegramChatId,
+      runlistDir: config.runlist.runlistDir,
+    });
+    console.log("📋 Runlist responder enabled (morning + nightly)");
+  }
+
   // Wire up logging
   bus.on("obsidian.note.modified", (signal) => {
     const filename = signal.payload.path.split("/").pop();
@@ -301,6 +336,14 @@ async function cmdStart() {
     }
   });
 
+  bus.on("linwheel.drafts.generated", (signal) => {
+    const { noteFile, postsCreated, angles } = signal.payload;
+    const filename = noteFile.split("/").pop();
+    console.log(
+      `📎 [${timestamp()}] LinWheel: ${postsCreated} draft(s) from ${filename} (angles: ${angles.join(", ")})`,
+    );
+  });
+
   // Register responders
   const unsubs: Array<() => void> = [];
   unsubs.push(extractorResponder.register(bus));
@@ -313,6 +356,12 @@ async function cmdStart() {
   }
   if (githubWatcherResponder) {
     unsubs.push(githubWatcherResponder.register(bus));
+  }
+  if (linwheelPublisherResponder) {
+    unsubs.push(linwheelPublisherResponder.register(bus));
+  }
+  if (runlistResponder) {
+    unsubs.push(runlistResponder.register(bus));
   }
 
   // Start sources
