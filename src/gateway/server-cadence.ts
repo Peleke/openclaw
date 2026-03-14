@@ -16,21 +16,12 @@ import {
   type OpenClawBus,
   // P1 Content Pipeline
   loadCadenceConfig,
-  getScheduledJobs,
-  createCronBridge,
-  createInsightExtractorResponder,
-  createInsightDigestResponder,
-  createTelegramNotifierResponder,
-  createLinWheelPublisherResponder,
-  createGitHubWatcherResponder,
-  createRunlistResponder,
+  buildCadencePipeline,
   createOpenClawLLMAdapter,
   registerResponders,
-  type Responder,
   type Source,
   type OpenClawSignal,
 } from "../cadence/index.js";
-import { LinWheel } from "@linwheel/sdk";
 
 export interface CadenceGatewayState {
   bus: OpenClawBus;
@@ -43,25 +34,15 @@ export interface StartCadenceOptions {
 }
 
 /**
- * P1 Content Pipeline result.
- */
-interface P1PipelineResult {
-  sources: Source<OpenClawSignal>[];
-  responders: Responder[];
-}
-
-/**
  * Set up the P1 Content Pipeline (insight extraction and delivery).
  *
- * Reads config from ~/.openclaw/cadence.json and creates:
- * - InsightExtractor responder (LLM-powered extraction)
- * - InsightDigest responder (batching and scheduling)
- * - TelegramNotifier responder (delivery)
- * - CronBridge source (scheduled triggers)
+ * Delegates to the shared buildCadencePipeline() for responder/source
+ * creation. Gateway-specific concerns (LLM init error handling, logging)
+ * remain here.
  *
  * Returns null if P1 is not configured or disabled.
  */
-async function setupP1ContentPipeline(log: SubsystemLogger): Promise<P1PipelineResult | null> {
+async function setupP1ContentPipeline(log: SubsystemLogger) {
   const p1Config = await loadCadenceConfig();
 
   // Skip if not enabled or no vault configured
@@ -74,9 +55,6 @@ async function setupP1ContentPipeline(log: SubsystemLogger): Promise<P1PipelineR
     log.warn("cadence: P1 enabled but no vaultPath configured");
     return null;
   }
-
-  const sources: Source<OpenClawSignal>[] = [];
-  const responders: Responder[] = [];
 
   // LLM Provider (uses OpenClaw's auth system)
   let llmProvider;
@@ -94,123 +72,17 @@ async function setupP1ContentPipeline(log: SubsystemLogger): Promise<P1PipelineR
     return null;
   }
 
-  // Insight Extractor
-  responders.push(
-    createInsightExtractorResponder({
-      config: {
-        // Ensure keywords is always an array (config allows optional)
-        pillars: p1Config.pillars.map((p) => ({
-          id: p.id,
-          name: p.name,
-          keywords: p.keywords ?? [],
-        })),
-        magicString: p1Config.extraction.publishTag,
-      },
-      llm: llmProvider,
-    }),
+  // Build pipeline using the shared builder
+  const result = buildCadencePipeline({
+    config: p1Config,
+    llmProvider,
+  });
+
+  log.info(
+    `cadence: P1 pipeline built (${result.responders.length} responders, ${result.sources.length} sources)`,
   );
 
-  // Build cron trigger job IDs for digest responder
-  const cronTriggerJobIds: string[] = [];
-  if (p1Config.schedule.enabled) {
-    if (p1Config.schedule.nightlyDigest) cronTriggerJobIds.push("nightly-digest");
-    if (p1Config.schedule.morningStandup) cronTriggerJobIds.push("morning-standup");
-  }
-
-  // Insight Digest
-  responders.push(
-    createInsightDigestResponder({
-      config: {
-        minInsightsToFlush: p1Config.digest.minToFlush,
-        maxHoursBetweenFlushes: p1Config.digest.maxHoursBetween,
-        cooldownHours: p1Config.digest.cooldownHours,
-        quietHoursStart: p1Config.digest.quietHoursStart,
-        quietHoursEnd: p1Config.digest.quietHoursEnd,
-      },
-      cronTriggerJobIds,
-    }),
-  );
-
-  // Telegram Notifier (if configured)
-  if (p1Config.delivery.channel === "telegram" && p1Config.delivery.telegramChatId) {
-    responders.push(
-      createTelegramNotifierResponder({
-        telegramChatId: p1Config.delivery.telegramChatId,
-        deliverDigests: true,
-        notifyOnFileChange: false, // Digest mode only
-      }),
-    );
-    log.debug(
-      `cadence: P1 Telegram delivery configured (chat: ${p1Config.delivery.telegramChatId})`,
-    );
-  } else if (p1Config.delivery.channel === "log") {
-    log.debug("cadence: P1 delivery channel is 'log' - digests will only be logged");
-  } else {
-    log.warn(`cadence: P1 delivery channel '${p1Config.delivery.channel}' not fully configured`);
-  }
-
-  // LinWheel Publisher (if API key available)
-  const linwheelApiKey = process.env.LINWHEEL_API_KEY?.trim();
-  if (linwheelApiKey) {
-    const linwheelClient = new LinWheel({
-      apiKey: linwheelApiKey,
-      ...(process.env.LINWHEEL_SIGNING_SECRET?.trim()
-        ? { signingSecret: process.env.LINWHEEL_SIGNING_SECRET.trim() }
-        : {}),
-      ...(process.env.LINWHEEL_BASE_URL?.trim()
-        ? { baseUrl: process.env.LINWHEEL_BASE_URL.trim() }
-        : {}),
-    });
-    responders.push(createLinWheelPublisherResponder({ client: linwheelClient }));
-    log.info("cadence: P1 LinWheel publisher enabled (::linkedin → drafts)");
-  } else {
-    log.debug("cadence: P1 LinWheel publisher skipped (no LINWHEEL_API_KEY)");
-  }
-
-  // GitHub Watcher (if enabled in config)
-  if (p1Config.githubWatcher?.enabled) {
-    responders.push(
-      createGitHubWatcherResponder({
-        llm: llmProvider,
-        vaultPath: p1Config.vaultPath,
-        config: {
-          owner: p1Config.githubWatcher.owner ?? "Peleke",
-          scanTime: p1Config.githubWatcher.scanTime ?? "21:00",
-          outputDir: p1Config.githubWatcher.outputDir ?? "Buildlog",
-          maxBuildlogEntries: p1Config.githubWatcher.maxBuildlogEntries ?? 3,
-          excludeRepos: p1Config.githubWatcher.excludeRepos ?? [],
-        },
-      }),
-    );
-    log.info("cadence: P1 GitHub watcher enabled (nightly scan → synthesis)");
-  } else {
-    log.debug("cadence: P1 GitHub watcher skipped (not enabled)");
-  }
-
-  // Runlist Responder (morning ping + nightly recap)
-  if (p1Config.runlist?.enabled && p1Config.delivery.telegramChatId) {
-    responders.push(
-      createRunlistResponder({
-        vaultPath: p1Config.vaultPath,
-        telegramChatId: p1Config.delivery.telegramChatId,
-        runlistDir: p1Config.runlist.runlistDir,
-      }),
-    );
-    log.info("cadence: P1 Runlist responder enabled (morning + nightly)");
-  } else if (p1Config.runlist?.enabled) {
-    log.warn("cadence: P1 Runlist enabled but no telegramChatId configured");
-  }
-
-  // Cron Bridge (for scheduled digests + github watcher)
-  const jobs = getScheduledJobs(p1Config);
-  if (jobs.length > 0) {
-    sources.push(createCronBridge({ jobs }));
-    log.debug(
-      `cadence: P1 scheduled ${jobs.length} cron job(s): ${jobs.map((j) => j.id).join(", ")}`,
-    );
-  }
-
-  return { sources, responders };
+  return result;
 }
 
 /**

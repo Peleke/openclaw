@@ -1,10 +1,16 @@
 /**
- * Server Cadence tests — comprehensive coverage for P1 Content Pipeline integration.
+ * Server Cadence tests — gateway integration with shared pipeline builder.
  *
- * Tests the gateway integration of Cadence's P1 pipeline:
- * - setupP1ContentPipeline() configuration handling
- * - startGatewayCadence() bus lifecycle
- * - Error handling and graceful degradation
+ * Tests gateway-specific concerns:
+ * - Cadence enable/disable from OpenClaw config
+ * - Bus initialization and lifecycle
+ * - LLM provider error handling
+ * - Obsidian watcher setup
+ * - Delegation to buildCadencePipeline
+ * - Duplicate-process warning
+ *
+ * Responder-level tests (which responders are created for which config)
+ * live in pipeline-builder.test.ts.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -18,20 +24,9 @@ vi.mock("../cadence/index.js", () => ({
   destroyOpenClawBus: vi.fn(),
   createObsidianWatcherSource: vi.fn(),
   loadCadenceConfig: vi.fn(),
-  getScheduledJobs: vi.fn(),
-  createCronBridge: vi.fn(),
-  createInsightExtractorResponder: vi.fn(),
-  createInsightDigestResponder: vi.fn(),
-  createTelegramNotifierResponder: vi.fn(),
-  createLinWheelPublisherResponder: vi.fn(),
-  createGitHubWatcherResponder: vi.fn(),
-  createRunlistResponder: vi.fn(),
+  buildCadencePipeline: vi.fn(),
   createOpenClawLLMAdapter: vi.fn(),
   registerResponders: vi.fn(),
-}));
-
-vi.mock("@linwheel/sdk", () => ({
-  LinWheel: vi.fn(),
 }));
 
 import { startGatewayCadence, getGatewayCadenceBus } from "./server-cadence.js";
@@ -42,42 +37,21 @@ import {
   destroyOpenClawBus,
   createObsidianWatcherSource,
   loadCadenceConfig,
-  getScheduledJobs,
-  createCronBridge,
-  createInsightExtractorResponder,
-  createInsightDigestResponder,
-  createTelegramNotifierResponder,
-  createLinWheelPublisherResponder,
-  createGitHubWatcherResponder,
-  createRunlistResponder,
+  buildCadencePipeline,
   createOpenClawLLMAdapter,
   registerResponders,
 } from "../cadence/index.js";
 
-// Cast mocks for type safety
+// Cast mocks
 const mockInitOpenClawBus = initOpenClawBus as ReturnType<typeof vi.fn>;
 const mockGetOpenClawBus = getOpenClawBus as ReturnType<typeof vi.fn>;
 const mockDestroyOpenClawBus = destroyOpenClawBus as ReturnType<typeof vi.fn>;
 const mockCreateObsidianWatcherSource = createObsidianWatcherSource as ReturnType<typeof vi.fn>;
 const mockLoadCadenceConfig = loadCadenceConfig as ReturnType<typeof vi.fn>;
-const mockGetScheduledJobs = getScheduledJobs as ReturnType<typeof vi.fn>;
-const mockCreateCronBridge = createCronBridge as ReturnType<typeof vi.fn>;
-const mockCreateInsightExtractorResponder = createInsightExtractorResponder as ReturnType<
-  typeof vi.fn
->;
-const mockCreateInsightDigestResponder = createInsightDigestResponder as ReturnType<typeof vi.fn>;
-const mockCreateTelegramNotifierResponder = createTelegramNotifierResponder as ReturnType<
-  typeof vi.fn
->;
-const mockCreateLinWheelPublisherResponder = createLinWheelPublisherResponder as ReturnType<
-  typeof vi.fn
->;
-const mockCreateGitHubWatcherResponder = createGitHubWatcherResponder as ReturnType<typeof vi.fn>;
-const mockCreateRunlistResponder = createRunlistResponder as ReturnType<typeof vi.fn>;
+const mockBuildCadencePipeline = buildCadencePipeline as ReturnType<typeof vi.fn>;
 const mockCreateOpenClawLLMAdapter = createOpenClawLLMAdapter as ReturnType<typeof vi.fn>;
 const mockRegisterResponders = registerResponders as ReturnType<typeof vi.fn>;
 
-// Mock logger
 function createMockLogger(): SubsystemLogger {
   return {
     info: vi.fn(),
@@ -88,7 +62,6 @@ function createMockLogger(): SubsystemLogger {
   } as unknown as SubsystemLogger;
 }
 
-// Mock bus
 function createMockBus() {
   return {
     bus: {
@@ -102,16 +75,12 @@ function createMockBus() {
   };
 }
 
-// Default P1 config
 function createMockP1Config(overrides: Record<string, unknown> = {}) {
   return {
     enabled: true,
     vaultPath: "/test/vault",
     delivery: { channel: "telegram", telegramChatId: "123456" },
-    pillars: [
-      { id: "tech", name: "Technology", keywords: ["code", "software"] },
-      { id: "life", name: "Life" }, // No keywords - tests default to []
-    ],
+    pillars: [{ id: "tech", name: "Technology", keywords: ["code"] }],
     llm: { provider: "anthropic", model: "claude-3-5-haiku-latest" },
     extraction: { publishTag: "::publish" },
     digest: {
@@ -141,17 +110,11 @@ describe("startGatewayCadence", () => {
     mockBus = createMockBus();
     mockInitOpenClawBus.mockReturnValue(mockBus);
     mockCreateObsidianWatcherSource.mockReturnValue({ name: "obsidian-watcher" });
-    mockCreateCronBridge.mockReturnValue({ name: "cron-bridge" });
-    mockCreateInsightExtractorResponder.mockReturnValue({ name: "insight-extractor" });
-    mockCreateInsightDigestResponder.mockReturnValue({ name: "insight-digest" });
-    mockCreateTelegramNotifierResponder.mockReturnValue({ name: "telegram-notifier" });
-    mockCreateLinWheelPublisherResponder.mockReturnValue({ name: "linwheel-publisher" });
-    mockCreateGitHubWatcherResponder.mockReturnValue({ name: "github-watcher" });
-    mockCreateRunlistResponder.mockReturnValue({ name: "runlist" });
     mockCreateOpenClawLLMAdapter.mockReturnValue({ name: "openclaw-llm" });
-    mockGetScheduledJobs.mockReturnValue([
-      { id: "nightly-digest", name: "Nightly Digest", expr: "0 21 * * *", tz: "America/New_York" },
-    ]);
+    mockBuildCadencePipeline.mockReturnValue({
+      responders: [{ name: "insight-extractor" }, { name: "insight-digest" }],
+      sources: [{ name: "cron-bridge" }],
+    });
   });
 
   afterEach(() => {
@@ -208,11 +171,9 @@ describe("startGatewayCadence", () => {
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       await startGatewayCadence({ cfg, log: mockLog });
 
-      // Get the onError callback that was passed to initOpenClawBus
       const initCall = mockInitOpenClawBus.mock.calls[0][0];
       expect(initCall.onError).toBeDefined();
 
-      // Test the onError callback
       const mockError = new Error("Handler failed");
       const mockSignal = { type: "test.signal", id: "123" };
       initCall.onError(mockError, mockSignal);
@@ -247,84 +208,65 @@ describe("startGatewayCadence", () => {
     });
   });
 
-  describe("P1 pipeline integration", () => {
-    it("sets up P1 pipeline when config is enabled and valid", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+  describe("P1 pipeline delegation", () => {
+    it("calls buildCadencePipeline with config and llmProvider", async () => {
+      const p1Config = createMockP1Config();
+      mockLoadCadenceConfig.mockResolvedValue(p1Config);
 
-      const cfg = { cadence: { enabled: true, vaultPath: "/vault" } } as OpenClawConfig;
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       await startGatewayCadence({ cfg, log: mockLog });
 
-      // Should create all responders
-      expect(mockCreateOpenClawLLMAdapter).toHaveBeenCalledWith({
-        defaultProvider: "anthropic",
-        defaultModel: "claude-3-5-haiku-latest",
+      expect(mockBuildCadencePipeline).toHaveBeenCalledWith({
+        config: p1Config,
+        llmProvider: { name: "openclaw-llm" },
       });
-      expect(mockCreateInsightExtractorResponder).toHaveBeenCalled();
-      expect(mockCreateInsightDigestResponder).toHaveBeenCalled();
-      expect(mockCreateTelegramNotifierResponder).toHaveBeenCalled();
-
-      // Should register responders
-      expect(mockRegisterResponders).toHaveBeenCalled();
     });
 
-    it("adds cron bridge source when schedule is enabled", async () => {
+    it("registers responders from pipeline builder", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
 
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       await startGatewayCadence({ cfg, log: mockLog });
 
-      expect(mockCreateCronBridge).toHaveBeenCalled();
+      expect(mockRegisterResponders).toHaveBeenCalledWith(mockBus.bus, [
+        { name: "insight-extractor" },
+        { name: "insight-digest" },
+      ]);
+    });
+
+    it("adds sources from pipeline builder", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      await startGatewayCadence({ cfg, log: mockLog });
+
       expect(mockBus.addSource).toHaveBeenCalledWith({ name: "cron-bridge" });
     });
 
-    it("logs pipeline status with responder and source counts", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockLog.info).toHaveBeenCalledWith(
-        expect.stringMatching(/P1 pipeline ready.*responders.*sources/),
-      );
-    });
-
-    it("continues gracefully when P1 setup returns null (disabled)", async () => {
+    it("skips pipeline when P1 is disabled", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
 
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       const result = await startGatewayCadence({ cfg, log: mockLog });
 
-      // Should still return a valid result (bus started)
+      expect(mockBuildCadencePipeline).not.toHaveBeenCalled();
       expect(result).not.toBeNull();
       expect(mockBus.start).toHaveBeenCalled();
     });
-  });
 
-  describe("P1 disabled scenarios", () => {
-    it("returns null from P1 setup when p1Config.enabled is false", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      // P1 responders should NOT be created
-      expect(mockCreateInsightExtractorResponder).not.toHaveBeenCalled();
-      expect(mockCreateInsightDigestResponder).not.toHaveBeenCalled();
-    });
-
-    it("returns null from P1 setup when vaultPath is empty", async () => {
+    it("skips pipeline when vaultPath is empty", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ vaultPath: "" }));
 
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       await startGatewayCadence({ cfg, log: mockLog });
 
       expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining("no vaultPath configured"));
-      expect(mockCreateInsightExtractorResponder).not.toHaveBeenCalled();
+      expect(mockBuildCadencePipeline).not.toHaveBeenCalled();
     });
   });
 
   describe("LLM provider failures", () => {
-    it("returns null from P1 setup when createOpenClawLLMAdapter throws", async () => {
+    it("skips pipeline when createOpenClawLLMAdapter throws", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
       mockCreateOpenClawLLMAdapter.mockImplementation(() => {
         throw new Error("Invalid API key");
@@ -336,187 +278,19 @@ describe("startGatewayCadence", () => {
       expect(mockLog.error).toHaveBeenCalledWith(
         expect.stringContaining("Failed to create LLM provider"),
       );
-      expect(mockLog.warn).toHaveBeenCalledWith(
-        expect.stringContaining("P1 insight extraction will be disabled"),
-      );
-      expect(mockCreateInsightExtractorResponder).not.toHaveBeenCalled();
+      expect(mockBuildCadencePipeline).not.toHaveBeenCalled();
     });
 
     it("handles non-Error throws from LLM adapter", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
       mockCreateOpenClawLLMAdapter.mockImplementation(() => {
-        throw "string error"; // Non-Error throw
+        throw "string error";
       });
 
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       await startGatewayCadence({ cfg, log: mockLog });
 
       expect(mockLog.error).toHaveBeenCalledWith(expect.stringContaining("string error"));
-    });
-  });
-
-  describe("delivery channel variations", () => {
-    it("creates TelegramNotifier when channel is telegram and chatId is set", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          delivery: { channel: "telegram", telegramChatId: "123456" },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateTelegramNotifierResponder).toHaveBeenCalledWith({
-        telegramChatId: "123456",
-        deliverDigests: true,
-        notifyOnFileChange: false,
-      });
-    });
-
-    it("skips TelegramNotifier when channel is log", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          delivery: { channel: "log" },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateTelegramNotifierResponder).not.toHaveBeenCalled();
-      expect(mockLog.debug).toHaveBeenCalledWith(
-        expect.stringContaining("delivery channel is 'log'"),
-      );
-    });
-
-    it("warns when telegram channel lacks telegramChatId", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          delivery: { channel: "telegram" }, // No chatId
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateTelegramNotifierResponder).not.toHaveBeenCalled();
-      expect(mockLog.warn).toHaveBeenCalledWith(expect.stringContaining("not fully configured"));
-    });
-
-    it("warns for unknown delivery channels", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          delivery: { channel: "discord" }, // Not fully implemented
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockLog.warn).toHaveBeenCalledWith(
-        expect.stringContaining("'discord' not fully configured"),
-      );
-    });
-  });
-
-  describe("cron job scheduling", () => {
-    it("creates no cron jobs when schedule.enabled is false", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          schedule: { enabled: false },
-        }),
-      );
-      mockGetScheduledJobs.mockReturnValue([]);
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateCronBridge).not.toHaveBeenCalled();
-    });
-
-    it("creates cron bridge with jobs from getScheduledJobs", async () => {
-      const jobs = [
-        { id: "nightly-digest", name: "Nightly", expr: "0 21 * * *", tz: "UTC" },
-        { id: "morning-standup", name: "Morning", expr: "0 8 * * *", tz: "UTC" },
-      ];
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-      mockGetScheduledJobs.mockReturnValue(jobs);
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateCronBridge).toHaveBeenCalledWith({ jobs });
-    });
-
-    it("passes correct cronTriggerJobIds to digest responder", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          schedule: {
-            enabled: true,
-            nightlyDigest: "21:00",
-            morningStandup: "08:00",
-            timezone: "UTC",
-          },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateInsightDigestResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cronTriggerJobIds: ["nightly-digest", "morning-standup"],
-        }),
-      );
-    });
-
-    it("only includes nightly-digest when morningStandup is not set", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          schedule: {
-            enabled: true,
-            nightlyDigest: "21:00",
-            morningStandup: undefined,
-            timezone: "UTC",
-          },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateInsightDigestResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          cronTriggerJobIds: ["nightly-digest"],
-        }),
-      );
-    });
-  });
-
-  describe("pillar configuration", () => {
-    it("passes pillars with keywords defaulting to empty array", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          pillars: [
-            { id: "tech", name: "Tech", keywords: ["code"] },
-            { id: "life", name: "Life" }, // No keywords
-          ],
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateInsightExtractorResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            pillars: [
-              { id: "tech", name: "Tech", keywords: ["code"] },
-              { id: "life", name: "Life", keywords: [] },
-            ],
-          }),
-        }),
-      );
     });
   });
 
@@ -531,19 +305,6 @@ describe("startGatewayCadence", () => {
       expect(mockLog.info).toHaveBeenCalledWith("cadence: signal bus started");
     });
 
-    it("registers onAny handler for debug logging", async () => {
-      const originalEnv = process.env.CADENCE_DEBUG;
-      process.env.CADENCE_DEBUG = "1";
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockBus.bus.onAny).toHaveBeenCalled();
-
-      process.env.CADENCE_DEBUG = originalEnv;
-    });
-
     it("returns stop function that cleanly shuts down bus", async () => {
       mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
 
@@ -551,15 +312,10 @@ describe("startGatewayCadence", () => {
       const result = await startGatewayCadence({ cfg, log: mockLog });
 
       expect(result).not.toBeNull();
-      expect(result!.stop).toBeDefined();
-
-      // Call stop
       await result!.stop();
 
       expect(mockBus.stop).toHaveBeenCalled();
       expect(mockDestroyOpenClawBus).toHaveBeenCalled();
-      expect(mockLog.info).toHaveBeenCalledWith("cadence: stopping signal bus");
-      expect(mockLog.info).toHaveBeenCalledWith("cadence: signal bus stopped");
     });
 
     it("returns bus in result for external access", async () => {
@@ -568,169 +324,7 @@ describe("startGatewayCadence", () => {
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
       const result = await startGatewayCadence({ cfg, log: mockLog });
 
-      expect(result).not.toBeNull();
       expect(result!.bus).toBe(mockBus);
-    });
-  });
-
-  describe("LinWheel publisher registration", () => {
-    it("creates LinWheel publisher when LINWHEEL_API_KEY is set", async () => {
-      const origKey = process.env.LINWHEEL_API_KEY;
-      process.env.LINWHEEL_API_KEY = "lw_sk_test_key";
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateLinWheelPublisherResponder).toHaveBeenCalled();
-      process.env.LINWHEEL_API_KEY = origKey;
-    });
-
-    it("skips LinWheel publisher when LINWHEEL_API_KEY is not set", async () => {
-      const origKey = process.env.LINWHEEL_API_KEY;
-      delete process.env.LINWHEEL_API_KEY;
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
-      process.env.LINWHEEL_API_KEY = origKey;
-    });
-
-    it("skips LinWheel publisher when LINWHEEL_API_KEY is empty", async () => {
-      const origKey = process.env.LINWHEEL_API_KEY;
-      process.env.LINWHEEL_API_KEY = "";
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
-      process.env.LINWHEEL_API_KEY = origKey;
-    });
-
-    it("skips LinWheel publisher when LINWHEEL_API_KEY is whitespace", async () => {
-      const origKey = process.env.LINWHEEL_API_KEY;
-      process.env.LINWHEEL_API_KEY = "   ";
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateLinWheelPublisherResponder).not.toHaveBeenCalled();
-      process.env.LINWHEEL_API_KEY = origKey;
-    });
-  });
-
-  describe("GitHub watcher registration", () => {
-    it("creates GitHub watcher when githubWatcher.enabled is true", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          githubWatcher: { enabled: true, owner: "TestOrg", scanTime: "20:00" },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateGitHubWatcherResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          vaultPath: "/test/vault",
-          config: expect.objectContaining({
-            owner: "TestOrg",
-            scanTime: "20:00",
-          }),
-        }),
-      );
-    });
-
-    it("skips GitHub watcher when githubWatcher is undefined", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateGitHubWatcherResponder).not.toHaveBeenCalled();
-    });
-
-    it("skips GitHub watcher when githubWatcher.enabled is false", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({ githubWatcher: { enabled: false } }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateGitHubWatcherResponder).not.toHaveBeenCalled();
-    });
-
-    it("uses default values for optional GitHub watcher fields", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({ githubWatcher: { enabled: true } }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateGitHubWatcherResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          config: expect.objectContaining({
-            owner: "Peleke",
-            scanTime: "21:00",
-            outputDir: "Buildlog",
-            maxBuildlogEntries: 3,
-            excludeRepos: [],
-          }),
-        }),
-      );
-    });
-  });
-
-  describe("Runlist responder registration", () => {
-    it("creates Runlist responder when runlist.enabled and telegramChatId set", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          runlist: { enabled: true, runlistDir: "Runlist" },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateRunlistResponder).toHaveBeenCalledWith(
-        expect.objectContaining({
-          vaultPath: "/test/vault",
-          telegramChatId: "123456",
-          runlistDir: "Runlist",
-        }),
-      );
-    });
-
-    it("warns when runlist.enabled but no telegramChatId", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(
-        createMockP1Config({
-          runlist: { enabled: true },
-          delivery: { channel: "log" },
-        }),
-      );
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateRunlistResponder).not.toHaveBeenCalled();
-      expect(mockLog.warn).toHaveBeenCalledWith(
-        expect.stringContaining("Runlist enabled but no telegramChatId"),
-      );
-    });
-
-    it("skips Runlist when runlist is not in config", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
-
-      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
-
-      expect(mockCreateRunlistResponder).not.toHaveBeenCalled();
     });
   });
 

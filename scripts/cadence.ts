@@ -22,25 +22,15 @@ import { createSignalBus, type SignalBus } from "@peleke.s/cadence";
 
 import {
   loadCadenceConfig,
-  saveCadenceConfig,
   initCadenceConfig,
   getConfigPath,
-  getScheduledJobs,
-  DEFAULT_CONFIG,
-  type CadenceP1Config,
 } from "../src/cadence/config.js";
 import type { OpenClawSignal } from "../src/cadence/signals.js";
 import { createObsidianWatcherSource } from "../src/cadence/sources/obsidian-watcher.js";
-import { createCronBridge } from "../src/cadence/sources/cron-bridge.js";
-import { createInsightExtractorResponder } from "../src/cadence/responders/insight-extractor/index.js";
-import { createInsightDigestResponder } from "../src/cadence/responders/insight-digest/index.js";
-import { createTelegramNotifierResponder } from "../src/cadence/responders/telegram-notifier.js";
 import { createFileLogResponder } from "../src/cadence/responders/file-log.js";
-import { createGitHubWatcherResponder } from "../src/cadence/responders/github-watcher/index.js";
-import { createLinWheelPublisherResponder } from "../src/cadence/responders/linwheel-publisher/index.js";
-import { createRunlistResponder } from "../src/cadence/responders/runlist/index.js";
+import { buildCadencePipeline } from "../src/cadence/pipeline-builder.js";
 import { createOpenClawLLMAdapter } from "../src/cadence/llm/index.js";
-import { LinWheel } from "@linwheel/sdk";
+import { registerResponders } from "../src/cadence/responders/index.js";
 
 const COMMANDS = ["init", "config", "start", "status", "digest", "test", "help"] as const;
 type Command = (typeof COMMANDS)[number];
@@ -187,104 +177,27 @@ async function cmdStart() {
     defaultModel: config.llm.model,
   });
 
-  // 1. Obsidian watcher source
+  // 1. Obsidian watcher source (dogfood-specific; gateway adds separately)
   const obsidianSource = createObsidianWatcherSource({
     vaultPath: config.vaultPath,
     emitTasks: false,
   });
 
-  // 2. Cron source for scheduled jobs
-  const scheduledJobs = getScheduledJobs(config);
-  const cronSource = createCronBridge({
-    jobs: scheduledJobs,
-    onFire: (job) => console.log(`⏰ [${timestamp()}] Scheduled job: ${job.name}`),
+  // 2. Build pipeline using the shared builder (single source of truth)
+  const pipeline = buildCadencePipeline({
+    config,
+    llmProvider,
+    extraCronTriggerJobIds: ["manual-trigger"],
   });
 
-  // 3. Insight extractor responder
-  const extractorResponder = createInsightExtractorResponder({
-    config: {
-      pillars: config.pillars,
-      magicString: config.extraction.publishTag,
-    },
-    llm: llmProvider,
-  });
+  console.log(
+    `📦 Pipeline: ${pipeline.responders.length} responders, ${pipeline.sources.length} sources`,
+  );
 
-  // 4. Insight digest responder
-  const digestResponder = createInsightDigestResponder({
-    config: {
-      minInsightsToFlush: config.digest.minToFlush,
-      maxHoursBetweenFlushes: config.digest.maxHoursBetween,
-      cooldownHours: config.digest.cooldownHours,
-      quietHoursStart: config.digest.quietHoursStart,
-      quietHoursEnd: config.digest.quietHoursEnd,
-    },
-    cronTriggerJobIds: ["nightly-digest", "morning-standup", "manual-trigger"],
-  });
-
-  // 5. Delivery responder
-  let deliveryResponder;
-  if (config.delivery.channel === "telegram" && config.delivery.telegramChatId) {
-    deliveryResponder = createTelegramNotifierResponder({
-      telegramChatId: config.delivery.telegramChatId,
-      deliverDigests: true,
-      notifyOnFileChange: false,
-    });
-  }
-
-  // 6. File log responder (for sandbox container visibility)
-  let fileLogResponder;
+  // 3. File log responder (dogfood-specific; not in shared builder)
   const fileLogPath = config.delivery.fileLogPath;
   if (fileLogPath) {
-    fileLogResponder = createFileLogResponder({ filePath: fileLogPath });
-  }
-
-  // 7. GitHub watcher responder (nightly repo scan + synthesis)
-  let githubWatcherResponder;
-  if (config.githubWatcher?.enabled) {
-    githubWatcherResponder = createGitHubWatcherResponder({
-      llm: llmProvider,
-      vaultPath: config.vaultPath,
-      config: {
-        owner: config.githubWatcher.owner ?? "Peleke",
-        scanTime: config.githubWatcher.scanTime ?? "21:00",
-        outputDir: config.githubWatcher.outputDir ?? "Buildlog",
-        maxBuildlogEntries: config.githubWatcher.maxBuildlogEntries ?? 3,
-        excludeRepos: config.githubWatcher.excludeRepos ?? [],
-      },
-    });
-    console.log("🐙 GitHub watcher enabled (nightly scan → synthesis)");
-  }
-
-  // 8. LinWheel publisher responder (::linkedin → drafts)
-  let linwheelPublisherResponder;
-  const linwheelApiKey = process.env.LINWHEEL_API_KEY?.trim();
-  if (linwheelApiKey) {
-    const linwheelClient = new LinWheel({
-      apiKey: linwheelApiKey,
-      ...(process.env.LINWHEEL_SIGNING_SECRET?.trim()
-        ? { signingSecret: process.env.LINWHEEL_SIGNING_SECRET.trim() }
-        : {}),
-      ...(process.env.LINWHEEL_BASE_URL?.trim()
-        ? { baseUrl: process.env.LINWHEEL_BASE_URL.trim() }
-        : {}),
-    });
-    linwheelPublisherResponder = createLinWheelPublisherResponder({
-      client: linwheelClient,
-    });
-    console.log("📎 LinWheel publisher enabled (::linkedin → drafts)");
-  } else {
-    console.log("📎 LinWheel publisher skipped (no LINWHEEL_API_KEY)");
-  }
-
-  // 9. Runlist responder (morning ping + nightly recap)
-  let runlistResponder;
-  if (config.runlist?.enabled && config.delivery.telegramChatId) {
-    runlistResponder = createRunlistResponder({
-      vaultPath: config.vaultPath,
-      telegramChatId: config.delivery.telegramChatId,
-      runlistDir: config.runlist.runlistDir,
-    });
-    console.log("📋 Runlist responder enabled (morning + nightly)");
+    pipeline.responders.push(createFileLogResponder({ filePath: fileLogPath }));
   }
 
   // Wire up logging
@@ -344,30 +257,16 @@ async function cmdStart() {
     );
   });
 
-  // Register responders
+  // Register all responders from shared pipeline
   const unsubs: Array<() => void> = [];
-  unsubs.push(extractorResponder.register(bus));
-  unsubs.push(digestResponder.register(bus));
-  if (deliveryResponder) {
-    unsubs.push(deliveryResponder.register(bus));
-  }
-  if (fileLogResponder) {
-    unsubs.push(fileLogResponder.register(bus));
-  }
-  if (githubWatcherResponder) {
-    unsubs.push(githubWatcherResponder.register(bus));
-  }
-  if (linwheelPublisherResponder) {
-    unsubs.push(linwheelPublisherResponder.register(bus));
-  }
-  if (runlistResponder) {
-    unsubs.push(runlistResponder.register(bus));
+  for (const responder of pipeline.responders) {
+    unsubs.push(responder.register(bus));
   }
 
-  // Start sources
+  // Start sources: obsidian watcher + pipeline sources (cron bridge)
   await obsidianSource.start((signal) => bus.emit(signal));
-  if (scheduledJobs.length > 0) {
-    await cronSource.start((signal) => bus.emit(signal));
+  for (const source of pipeline.sources) {
+    await source.start((signal) => bus.emit(signal));
   }
 
   console.log("✅ Pipeline running!\n");

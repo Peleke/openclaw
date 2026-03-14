@@ -51,6 +51,14 @@ export {
   type RunlistResponderOptions,
 } from "./responders/runlist/index.js";
 
+// Pipeline builder
+export {
+  buildCadencePipeline,
+  createLinWheelClientFromEnv,
+  type PipelineBuilderOptions,
+  type CadencePipelineResult,
+} from "./pipeline-builder.js";
+
 // LLM
 export { createOpenClawLLMAdapter, createMockLLMProvider } from "./llm/openclaw-adapter.js";
 export type { LLMProvider, ChatMessage, ChatOptions, ChatResponse } from "./llm/types.js";
