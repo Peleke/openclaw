@@ -46,6 +46,10 @@ export {
   createGitHubWatcherResponder,
   type GitHubWatcherOptions,
 } from "./responders/github-watcher/index.js";
+export {
+  createRunlistResponder,
+  type RunlistResponderOptions,
+} from "./responders/runlist/index.js";
 
 // LLM
 export { createOpenClawLLMAdapter, createMockLLMProvider } from "./llm/openclaw-adapter.js";
