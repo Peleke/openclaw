@@ -532,6 +532,16 @@ export const OpenClawSchema = z
       })
       .strict()
       .optional(),
+    cadence: z
+      .object({
+        enabled: z.boolean().optional(),
+        timezone: z.string().optional(),
+        vaultPath: z.string().optional(),
+        channel: z.string().optional(),
+        to: z.string().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((cfg, ctx) => {

@@ -99,16 +99,6 @@ export async function startGatewayCadence(
     return null;
   }
 
-  // Warn about potential duplicate cadence process. The canonical runner
-  // is scripts/cadence.ts (openclaw-cadence.service in the sandbox VM).
-  // Running cadence in both the gateway AND the dogfood script causes
-  // duplicate cron triggers and duplicate LinWheel drafts.
-  log.warn(
-    "cadence: gateway cadence is enabled via openclaw.json. " +
-      "Ensure the openclaw-cadence.service (scripts/cadence.ts) is stopped " +
-      "to avoid duplicate cron triggers and signal processing.",
-  );
-
   log.info("cadence: initializing signal bus");
 
   const debug = process.env.CADENCE_DEBUG === "1";

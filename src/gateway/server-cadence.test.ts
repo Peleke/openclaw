@@ -328,16 +328,15 @@ describe("startGatewayCadence", () => {
     });
   });
 
-  describe("duplicate-process warning", () => {
-    it("logs warning when cadence is enabled via gateway config", async () => {
-      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
+  describe("gateway is canonical runner", () => {
+    it("initializes cadence when enabled in gateway config", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config());
 
       const cfg = { cadence: { enabled: true } } as OpenClawConfig;
-      await startGatewayCadence({ cfg, log: mockLog });
+      const result = await startGatewayCadence({ cfg, log: mockLog });
 
-      expect(mockLog.warn).toHaveBeenCalledWith(
-        expect.stringContaining("Ensure the openclaw-cadence.service"),
-      );
+      expect(result).not.toBeNull();
+      expect(mockLog.info).toHaveBeenCalledWith("cadence: initializing signal bus");
     });
   });
 });
