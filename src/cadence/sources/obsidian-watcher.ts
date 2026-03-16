@@ -140,10 +140,22 @@ export function createObsidianWatcherSource(
       awaitWriteFinish: { stabilityThreshold: 300, pollInterval: 100 },
     });
 
+    // Handle watcher errors (EACCES, ESTALE, etc.) gracefully instead of
+    // crashing the gateway. OverlayFS upper-layer files can be root-owned
+    // or have stale handles — log and continue watching other files.
+    watcher.on("error", (err: unknown) => {
+      const errno = err as NodeJS.ErrnoException;
+      const code = errno.code ?? "unknown";
+      const errPath = errno.path ?? "";
+      const message = err instanceof Error ? err.message : String(err);
+      console.warn(`[cadence/obsidian-watcher] watcher error (${code}): ${message}${errPath ? ` [${errPath}]` : ""}`);
+    });
+
     watcher.on("add", (path) => processFile(path, "add"));
     watcher.on("change", (path) => processFile(path, "change"));
 
-    // Wait for ready
+    // Wait for ready — errors during initial scan are handled by the
+    // error handler above, so the ready event will still fire.
     await new Promise<void>((resolve) => {
       watcher!.on("ready", resolve);
     });

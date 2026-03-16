@@ -263,9 +263,16 @@ export async function startGatewayCadence(
     );
   }
 
-  // Start all sources
-  await openClawBus.start();
-  log.info("cadence: signal bus started");
+  // Start all sources — catch errors so a broken watcher (EACCES, ESTALE)
+  // doesn't prevent the rest of the gateway (Telegram, etc.) from starting.
+  try {
+    await openClawBus.start();
+    log.info("cadence: signal bus started");
+  } catch (err) {
+    log.error(`cadence: signal bus failed to start: ${err instanceof Error ? err.message : String(err)}`);
+    log.warn("cadence: continuing without cadence — gateway will still serve channels");
+    return null;
+  }
 
   // Register default handlers for observability
   openClawBus.bus.onAny(async (signal) => {
