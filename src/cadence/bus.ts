@@ -80,12 +80,17 @@ export function createOpenClawBus(options: OpenClawBusOptions = {}): OpenClawBus
 
     running = true;
 
-    // Start all sources
+    // Start all sources — isolate failures so one broken source
+    // (e.g. EACCES on obsidian watcher) doesn't prevent others from running.
     for (const source of sources) {
       if (debug) {
         console.log(`[cadence] Starting source: ${source.name}`);
       }
-      await source.start((signal) => bus.emit(signal));
+      try {
+        await source.start((signal) => bus.emit(signal));
+      } catch (err) {
+        console.error(`[cadence] Source "${source.name}" failed to start: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     if (debug) {
