@@ -101,12 +101,17 @@ export function createOpenClawBus(options: OpenClawBusOptions = {}): OpenClawBus
   async function stop(): Promise<void> {
     if (!running) return;
 
-    // Stop all sources
+    // Stop all sources — isolate failures so one broken source
+    // doesn't prevent others from being cleaned up.
     for (const source of sources) {
       if (debug) {
         console.log(`[cadence] Stopping source: ${source.name}`);
       }
-      await source.stop();
+      try {
+        await source.stop();
+      } catch (err) {
+        console.error(`[cadence] Source "${source.name}" failed to stop: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
 
     // Clear handlers
