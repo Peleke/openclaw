@@ -553,6 +553,22 @@ describe("startGatewayCadence", () => {
       expect(result).not.toBeNull();
       expect(result!.bus).toBe(mockBus);
     });
+
+    it("returns null and logs warning when bus.start() fails (EACCES)", async () => {
+      mockLoadCadenceConfig.mockResolvedValue(createMockP1Config({ enabled: false }));
+      mockBus.start.mockRejectedValue(new Error("EACCES: permission denied, watch '/workspace-obsidian/file.md'"));
+
+      const cfg = { cadence: { enabled: true } } as OpenClawConfig;
+      const result = await startGatewayCadence({ cfg, log: mockLog });
+
+      expect(result).toBeNull();
+      expect(mockLog.error).toHaveBeenCalledWith(
+        expect.stringContaining("signal bus failed to start"),
+      );
+      expect(mockLog.warn).toHaveBeenCalledWith(
+        expect.stringContaining("continuing without cadence"),
+      );
+    });
   });
 });
 
