@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { resolveOAuthDir } from "./config/paths.js";
+import { resolveHomeDir as resolveHomeDirFromConfig, resolveOAuthDir } from "./config/paths.js";
 import { logVerbose, shouldLogVerbose } from "./globals.js";
 
 export async function ensureDir(dir: string) {
@@ -205,7 +205,7 @@ export function resolveUserPath(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return trimmed;
   if (trimmed.startsWith("~")) {
-    const expanded = trimmed.replace(/^~(?=$|[\\/])/, os.homedir());
+    const expanded = trimmed.replace(/^~(?=$|[\\/])/, resolveHomeDirFromConfig());
     return path.resolve(expanded);
   }
   return path.resolve(trimmed);
@@ -213,7 +213,7 @@ export function resolveUserPath(input: string): string {
 
 export function resolveConfigDir(
   env: NodeJS.ProcessEnv = process.env,
-  homedir: () => string = os.homedir,
+  homedir: () => string = () => resolveHomeDirFromConfig(env),
 ): string {
   const override = env.OPENCLAW_STATE_DIR?.trim() || env.CLAWDBOT_STATE_DIR?.trim();
   if (override) return resolveUserPath(override);
@@ -228,6 +228,9 @@ export function resolveConfigDir(
 }
 
 export function resolveHomeDir(): string | undefined {
+  // OPENCLAW_HOME_DIR overrides everything — used in sandbox VMs
+  const openclawHome = process.env.OPENCLAW_HOME_DIR?.trim();
+  if (openclawHome) return openclawHome;
   const envHome = process.env.HOME?.trim();
   if (envHome) return envHome;
   const envProfile = process.env.USERPROFILE?.trim();

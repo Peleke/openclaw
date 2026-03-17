@@ -21,11 +21,25 @@ const NEW_STATE_DIRNAME = ".openclaw";
 const CONFIG_FILENAME = "openclaw.json";
 const LEGACY_CONFIG_FILENAMES = ["clawdbot.json", "moltbot.json", "moldbot.json"] as const;
 
-function legacyStateDirs(homedir: () => string = os.homedir): string[] {
+/**
+ * Resolve the effective home directory.
+ * OPENCLAW_HOME_DIR overrides os.homedir() — used in sandbox VMs where
+ * the Linux home differs from the macOS host that generated the config.
+ */
+export function resolveHomeDir(
+  env: NodeJS.ProcessEnv = process.env,
+  fallback: () => string = os.homedir,
+): string {
+  const override = env.OPENCLAW_HOME_DIR?.trim();
+  if (override) return override;
+  return fallback();
+}
+
+function legacyStateDirs(homedir: () => string = () => resolveHomeDir()): string[] {
   return LEGACY_STATE_DIRNAMES.map((dir) => path.join(homedir(), dir));
 }
 
-function newStateDir(homedir: () => string = os.homedir): string {
+function newStateDir(homedir: () => string = () => resolveHomeDir()): string {
   return path.join(homedir(), NEW_STATE_DIRNAME);
 }
 
@@ -48,7 +62,7 @@ export function resolveNewStateDir(homedir: () => string = os.homedir): string {
  */
 export function resolveStateDir(
   env: NodeJS.ProcessEnv = process.env,
-  homedir: () => string = os.homedir,
+  homedir: () => string = () => resolveHomeDir(env),
 ): string {
   const override = env.OPENCLAW_STATE_DIR?.trim() || env.CLAWDBOT_STATE_DIR?.trim();
   if (override) return resolveUserPath(override);
@@ -71,7 +85,7 @@ function resolveUserPath(input: string): string {
   const trimmed = input.trim();
   if (!trimmed) return trimmed;
   if (trimmed.startsWith("~")) {
-    const expanded = trimmed.replace(/^~(?=$|[\\/])/, os.homedir());
+    const expanded = trimmed.replace(/^~(?=$|[\\/])/, resolveHomeDir());
     return path.resolve(expanded);
   }
   return path.resolve(trimmed);
